@@ -229,7 +229,7 @@ async function fetchBtcCandles(start, end, granularity, signal) {
     url.searchParams.set("granularity", String(granularity));
     let response;
     try {
-      response = await fetch(url, { signal, headers: { Accept: "application/json", "User-Agent": "BTC-Options-Local/2.1" } });
+      response = await fetch(url, { signal, headers: { Accept: "application/json" } });
     } catch (error) {
       if (signal.aborted) throw error;
       throw new Error("無法連線 Coinbase BTC/USD API，請確認網路後按重讀");
