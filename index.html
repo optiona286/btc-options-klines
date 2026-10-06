@@ -1,0 +1,1485 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#090d14">
+  <title>BTC Options K 線系統</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #090d14;
+      --panel: #111823;
+      --panel2: #151e2b;
+      --line: #263244;
+      --line2: #344154;
+      --text: #e6edf7;
+      --muted: #8290a5;
+      --cyan: #42c8f5;
+      --up: #ea3943;
+      --down: #16c784;
+      --ok: #16c784;
+      --amber: #f5b942;
+      --violet: #9d7bff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", "Microsoft JhengHei", sans-serif;
+    }
+    button, select, input { font: inherit; }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(17,24,35,.96);
+    }
+    .brand { display: flex; align-items: center; gap: 11px; }
+    .mark {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      color: #071017;
+      background: var(--amber);
+      font-weight: 900;
+    }
+    h1 { margin: 0; font-size: 17px; letter-spacing: .2px; }
+    .subtitle { color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .status { color: var(--muted); font-size: 12px; white-space: nowrap; }
+    .status.ok::before {
+      content: "";
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--ok);
+      margin-right: 7px;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(360px, 30vw) minmax(0, 1fr);
+      height: calc(100vh - 63px);
+    }
+    aside {
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: auto auto auto auto minmax(0, 1fr);
+      border-right: 1px solid var(--line);
+      background: #0d131c;
+    }
+    .controls {
+      display: grid;
+      grid-template-columns: minmax(0, 1.3fr) 118px;
+      gap: 10px;
+      padding: 14px 14px 10px;
+      border-bottom: 1px solid var(--line);
+    }
+    .field label, .section-label {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+    select, input[type="search"] {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--panel2);
+      color: var(--text);
+      padding: 9px 10px;
+      outline: none;
+    }
+    select:focus, input:focus { border-color: var(--cyan); }
+    .chain-toolbar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 96px;
+      gap: 10px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+    .btn {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--panel2);
+      color: var(--text);
+      padding: 9px 10px;
+      cursor: pointer;
+    }
+    .btn:hover { border-color: #43516a; }
+    .chain-headline {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 14px 9px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .chain-wrap {
+      min-height: 0;
+      overflow: auto;
+      padding: 0 10px 12px;
+    }
+    .chain-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0 5px;
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+    .chain-table th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #0d131c;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 6px 5px;
+      text-align: center;
+    }
+    .quote {
+      width: 42%;
+      border: 1px solid transparent;
+      background: var(--panel);
+      cursor: pointer;
+      padding: 7px 8px;
+    }
+    .quote.call { border-radius: 7px 0 0 7px; text-align: right; }
+    .quote.put { border-radius: 0 7px 7px 0; text-align: left; }
+    .quote:hover { border-color: var(--line2); background: #172232; }
+    .quote.active { border-color: var(--cyan); background: #123044; }
+    .strike {
+      width: 16%;
+      text-align: center;
+      padding: 7px 6px;
+      background: #182231;
+      color: var(--amber);
+      font-weight: 800;
+      border-left: 1px solid #0d131c;
+      border-right: 1px solid #0d131c;
+    }
+    .price-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: baseline;
+    }
+    .quote.call .price-line { flex-direction: row-reverse; }
+    .last { font-size: 13px; color: var(--text); }
+    .chg.up { color: var(--up); }
+    .chg.down { color: var(--down); }
+    .subline { color: var(--muted); font-size: 10px; margin-top: 3px; }
+    .quote.call .subline { text-align: right; }
+    .empty { color: var(--muted); padding: 14px 4px; font-size: 12px; }
+    main {
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr);
+    }
+    .instrument {
+      padding: 14px 18px 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .instrument h2 { margin: 0 0 5px; font-size: 20px; }
+    .meta { color: var(--muted); font-size: 12px; }
+    .last-price { text-align: right; }
+    .last-price strong { font-size: 25px; font-variant-numeric: tabular-nums; }
+    .change { margin-top: 3px; font-size: 12px; }
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 1px;
+      margin: 0 18px 10px;
+      border: 1px solid var(--line);
+      background: var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .card { background: var(--panel); padding: 9px 11px; min-width: 0; }
+    .card span { display: block; color: var(--muted); font-size: 10px; margin-bottom: 4px; }
+    .card b { font-size: 13px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+    .chart-wrap {
+      position: relative;
+      min-height: 380px;
+      margin: 0 18px 18px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--panel);
+    }
+    canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+    .chart-tools {
+      position: absolute;
+      z-index: 2;
+      top: 9px;
+      left: 10px;
+      display: flex;
+      gap: 5px;
+      flex-wrap: wrap;
+    }
+    .toggle {
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background: rgba(17,24,35,.88);
+      color: var(--muted);
+      padding: 4px 7px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .toggle.active { color: var(--text); border-color: #52627a; }
+    .tooltip {
+      position: absolute;
+      z-index: 3;
+      display: none;
+      pointer-events: none;
+      min-width: 214px;
+      max-width: 238px;
+      padding: 9px 10px;
+      border: 1px solid rgba(66,200,245,.32);
+      border-radius: 9px;
+      background: rgba(9,13,20,.95);
+      font-size: 12px;
+      line-height: 1.35;
+      box-shadow: 0 12px 30px rgba(0,0,0,.42);
+      backdrop-filter: blur(6px);
+    }
+    .tip-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: center;
+      padding-bottom: 6px;
+      margin-bottom: 6px;
+      border-bottom: 1px solid rgba(130,144,165,.22);
+    }
+    .tip-time { font-size: 12px; font-weight: 800; color: var(--text); }
+    .tip-period {
+      flex: 0 0 auto;
+      border: 1px solid rgba(66,200,245,.35);
+      border-radius: 999px;
+      padding: 2px 6px;
+      color: var(--cyan);
+      background: rgba(66,200,245,.08);
+      font-size: 10px;
+      font-weight: 800;
+    }
+    .tip-grid {
+      display: grid;
+      gap: 4px;
+    }
+    .tip-label {
+      color: var(--muted);
+      font-size: 11px;
+    }
+    .tip-value {
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+    .tip-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 2px 0;
+    }
+    .tip-row.compact {
+      color: var(--muted);
+      font-size: 11px;
+      border-top: 1px solid rgba(130,144,165,.14);
+      margin-top: 5px;
+      padding-top: 6px;
+    }
+    body { height: 100dvh; display: flex; flex-direction: column; }
+    .layout { flex: 1; min-height: 0; height: auto; }
+    .topbar { flex-wrap: wrap; padding: 12px 18px; }
+    .brand h1 { display: flex; gap: 8px; align-items: center; }
+    .version { color: var(--cyan); font-size: 10px; border: 1px solid #285365; border-radius: 5px; padding: 3px 5px; }
+    .top-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .top-actions .btn { width: auto; font-size: 12px; padding: 7px 10px; }
+    .status { max-width: 440px; white-space: normal; line-height: 1.5; }
+    .filters { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px 14px 0; }
+    .chain-headline { gap: 8px; padding-top: 9px; font-size: 11px; }
+    .chain-headline span:last-child { text-align: right; }
+    .strike small { display: block; color: var(--muted); font-size: 9px; margin-top: 4px; font-weight: 400; }
+    .strike-button { display: block; width: 100%; padding: 6px 2px; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--amber); font: inherit; font-weight: 800; cursor: pointer; }
+    .strike-button:hover, .strike-button.active { color: var(--cyan); background: #123044; border-color: var(--cyan); }
+    .strike-button .btc-hint { color: var(--muted); font-size: 9px; margin-top: 3px; display: block; font-weight: 400; }
+    .strike-button.active .btc-hint { color: var(--cyan); }
+    .chart-kind { display: inline-block; color: var(--cyan); font-size: 11px; padding: 3px 6px; border: 1px solid #285365; border-radius: 4px; margin-bottom: 6px; }
+    .final-session { color: var(--amber); font-size: 11px; line-height: 1.6; margin-top: 5px; }
+    .final-session::before { content: ""; display: inline-block; width: 8px; height: 8px; background: rgba(245,185,66,.35); border: 1px solid var(--amber); margin-right: 6px; }
+    .toggle.active[data-indicator="finalSession"] { color: var(--amber); border-color: #85672d; }
+    .toggle.active[data-indicator="finalSixHours"] { color: var(--violet); border-color: #6850b6; }
+    .final-session.final-six { color: var(--violet); }
+    .final-session.final-six::before { background: rgba(157,123,255,.18); border-color: var(--violet); }
+    .star { border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 17px; padding: 0 3px; }
+    .star.saved { color: var(--amber); }
+    .quote:focus-visible, button:focus-visible { outline: 2px solid var(--cyan); outline-offset: -2px; }
+    .instrument h2 { font-size: clamp(14px, 1.6vw, 20px); overflow-wrap: anywhere; }
+    .meta { line-height: 1.7; }
+    .source-info { color: var(--muted); font-size: 11px; margin-top: 4px; }
+    .chart-tools { position: relative; top: auto; left: auto; padding: 9px 10px; border-bottom: 1px solid var(--line); }
+    .chart-wrap { display: flex; flex-direction: column; min-height: 260px; }
+    .chart-stage { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+    canvas { position: absolute; inset: 0; touch-action: none; }
+    .chart-message { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); pointer-events: none; font-size: 14px; }
+    .chart-message[hidden] { display: none; }
+    .chart-footer { display: flex; justify-content: space-between; gap: 10px; padding: 7px 10px; border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; }
+    .toggle.active[data-indicator="ma7"] { color: var(--amber); }
+    .toggle.active[data-indicator="ma20"] { color: var(--cyan); }
+    .toggle.active[data-indicator="bb"] { color: var(--violet); }
+    .layout.focus { grid-template-columns: minmax(0, 1fr); }
+    .layout.focus aside { display: none; }
+    @media (max-width: 980px) {
+      .layout { grid-template-columns: 390px minmax(0, 1fr); }
+      .cards { grid-template-columns: repeat(3, 1fr); }
+    }
+    .mobile-nav { display: none; }
+    @media (max-width: 760px), (max-width: 980px) and (pointer: coarse) {
+      body { height: 100dvh; overflow: hidden; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+      .topbar { padding: 8px 12px; gap: 5px; flex-shrink: 0; }
+      .brand h1 { font-size: 14px; }
+      .brand .mark { width: 28px; height: 28px; }
+      .subtitle { display: none; }
+      .top-actions { width: 100%; gap: 6px; }
+      .top-actions .status { display: block; flex: 1; min-width: 0; font-size: 10px; }
+      .top-actions .btn { min-height: 36px; }
+      #focusChart { display: none; }
+      .mobile-nav { display: flex; align-items: center; flex-shrink: 0; gap: 6px; padding: 6px 10px; border-bottom: 1px solid var(--line); background: var(--panel); }
+      .mobile-nav button { min-height: 44px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel2); color: var(--muted); padding: 8px 10px; font: inherit; font-size: 13px; }
+      .mobile-nav button[aria-pressed="true"] { color: var(--cyan); border-color: var(--cyan); background: #123044; }
+      .mobile-nav select { width: 75px; min-height: 44px; padding: 8px 4px; margin-left: auto; font-size: 16px; }
+      .layout, .layout.focus { display: block; height: auto; overflow: auto; overscroll-behavior: contain; }
+      .layout[data-mobile-view="chain"] aside { display: grid; height: 100%; min-height: 420px; border: 0; }
+      .layout[data-mobile-view="chain"] main { display: none; }
+      .layout[data-mobile-view="chart"] aside { display: none; }
+      .layout[data-mobile-view="chart"] main { display: grid; height: 100%; min-height: 620px; }
+      .controls, .filters { padding-left: 10px; padding-right: 10px; }
+      .chain-toolbar { padding: 8px 10px; }
+      select, input[type="search"] { font-size: 16px; min-height: 44px; }
+      .chain-wrap { padding: 0 6px 10px; }
+      .chain-table { table-layout: fixed; }
+      .chain-table th:nth-child(2) { width: 26%; }
+      .quote { width: 37%; padding: 7px 5px; }
+      .strike { width: 26%; padding: 2px; }
+      .strike-button { min-height: 56px; font-size: 13px; }
+      .price-line { flex-wrap: wrap; gap: 2px 5px; }
+      .last { font-size: 14px; }
+      .chg { font-size: 11px; }
+      .star { min-width: 32px; min-height: 36px; vertical-align: middle; }
+      .subline { font-size: 10px; }
+      .instrument { padding: 10px; gap: 8px; }
+      .instrument h2 { font-size: 15px; }
+      .instrument > div:first-child { min-width: 0; }
+      .meta, .source-info, .final-session { font-size: 10px; }
+      .last-price { flex-shrink: 0; }
+      .last-price strong { font-size: 19px; }
+      .change { font-size: 10px; max-width: 105px; }
+      .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0 10px 8px; }
+      .card { padding: 6px 8px; }
+      .chart-wrap { margin: 0 8px 8px; min-height: 260px; }
+      .chart-tools { flex-wrap: nowrap; overflow-x: auto; flex-shrink: 0; padding: 6px; gap: 5px; scrollbar-width: thin; }
+      .toggle { min-height: 40px; padding: 6px 10px; flex-shrink: 0; font-size: 12px; }
+      .chart-footer { flex-direction: column; gap: 2px; font-size: 9px; padding: 5px 7px; }
+      .tooltip { min-width: 202px; max-width: 220px; }
+    }
+    @media (max-height: 500px) and (pointer: coarse) {
+      .topbar { display: none; }
+      .layout[data-mobile-view="chart"] main { min-height: 430px; }
+      .cards { display: none; }
+      main { grid-template-rows: auto minmax(260px, 1fr); }
+    }
+      .chain-table th.call-heading { background: #a92e3e; color: #fff; }
+    .chain-table th.put-heading { background: #137b55; color: #fff; }
+    .chain-table th.strike-heading { background: #e4b535; color: #241b04; }
+    .cards.cross-info { display: grid; grid-template-columns: minmax(145px, 1.6fr) repeat(7, minmax(65px, 1fr)); overflow-x: auto; }
+    .cross-info .card { white-space: nowrap; }
+    @media (max-width: 900px) { .cards.cross-info { grid-template-columns: minmax(145px, 1.6fr) repeat(7, minmax(72px, 1fr)); } }
+    .cross-info .card:nth-child(n+2):nth-child(-n+5) { text-align: center; }
+    .cross-info .card:nth-child(n+2):nth-child(-n+5) span { font-size: 13px; }
+    .cross-info .card:nth-child(n+2):nth-child(-n+5) b { font-size: 18px; }
+    .cross-info .card:nth-child(6) { text-align: center; }
+    .cross-info .card:nth-child(6) span { font-size: 13px; }
+    .cross-info .card:nth-child(6) b { font-size: 18px; }
+    .cards.cross-info { grid-template-columns: minmax(145px, 1.6fr) repeat(4, minmax(65px, 1fr)) minmax(160px, 1.6fr) repeat(2, minmax(72px, 1fr)); }
+    aside .controls { padding: 9px 12px 8px; gap: 8px; }
+    aside .filters { padding: 8px 12px 0; gap: 8px; }
+    aside .chain-toolbar { padding: 8px 12px; gap: 8px; }
+    aside .field label { font-size: 10px; margin-bottom: 4px; letter-spacing: .04em; }
+    aside select, aside input[type="search"], aside .btn { font-size: 14px; min-height: 36px; padding: 6px 9px; }
+    .chain-table th.call-heading { background: #722c36; color: #fff0f1; border-bottom: 2px solid #bc4153; }
+    .chain-table th.put-heading { background: #185641; color: #e8fff5; border-bottom: 2px solid #279e72; }
+    .chain-table th.strike-heading { background: #a58028; color: #fff6cf; border-bottom: 2px solid #e4b535; }
+    .chain-table th { font-size: 12px; padding: 8px 5px; }
+    .chain-table .last { font-size: 17px; font-weight: 700; }
+    .chain-table .strike-button { font-size: 16px; }
+    .chain-table .price-line > .chg { font-size: 12px; }
+    .chain-table .subline { font-size: 10px; opacity: .8; margin-top: 5px; }
+    .chain-table .quote { padding: 9px 8px; }
+    aside .controls { padding: 5px 10px; gap: 6px; }
+    aside .filters { padding: 5px 10px 0; gap: 6px; }
+    aside .chain-toolbar { padding: 5px 10px; gap: 6px; }
+    aside .field label { margin-bottom: 2px; font-size: 10px; line-height: 1.2; }
+    aside select, aside input[type="search"], aside .btn { min-height: 30px; height: 30px; padding: 3px 8px; font-size: 13px; }
+    .chain-table th.call-heading { background: #a92e3e; color: #fff; border-bottom: 0; }
+    .chain-table th.put-heading { background: #137b55; color: #fff; border-bottom: 0; }
+    .chain-table th.strike-heading { background: #e4b535; color: #241b04; border-bottom: 0; }
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="mark">K</div>
+      <div>
+        <h1>BTC Options K 線系統 <span class="version">2.1</span></h1>
+        <div class="subtitle">期權鏈・歷史行情工作台</div>
+      </div>
+    </div>
+    <div class="top-actions">
+      <div id="status" class="status" role="status" aria-live="polite">等待載入</div>
+      <button id="autoRefresh" class="btn" aria-pressed="false" title="每 30 秒重讀；BTC 模式依契約時間區間查詢 API">自動重讀：關</button>
+      <button id="focusChart" class="btn" aria-pressed="false">專注看盤</button>
+    </div>
+  </header>
+
+  <nav class="mobile-nav" aria-label="手機看盤導覽">
+    <button id="mobileChain" aria-pressed="true">期權鏈</button>
+    <button id="mobileChart" aria-pressed="false">K 線</button>
+    <select id="mobilePeriod" aria-label="手機 K 線週期"></select>
+    <button id="mobileRefresh" aria-label="重新載入行情">重讀</button>
+  </nav>
+  <div class="layout" data-mobile-view="chain">
+    <aside>
+      <div class="controls">
+        <div class="field">
+          <label for="fileSelect">選擇到期日期</label>
+          <select id="fileSelect"></select>
+        </div>
+        <div class="field">
+          <label for="periodSelect">K 線週期</label>
+          <select id="periodSelect"></select>
+        </div>
+      </div>
+      <div class="filters">
+        <div class="field"><label for="expirySelect">到期日</label><select id="expirySelect"></select></div>
+        <div class="field"><label for="chainMode">合約列表</label><select id="chainMode"><option value="strike">履約價排序</option><option value="volume">成交量優先</option><option value="favorites">★ 我的自選</option></select></div>
+      </div>
+      <div class="chain-toolbar">
+        <div class="field" style="margin:0">
+          <label for="search">搜尋履約價 / 合約</label>
+          <input id="search" type="search" placeholder="65000 或 BTC-260624">
+        </div>
+        <div class="field" style="margin:0">
+          <label>&nbsp;</label>
+          <button id="refresh" class="btn">重讀</button>
+        </div>
+      </div>
+      <div class="chain-headline">
+        <span>T 字期權鏈 <span id="chainCount"></span></span>
+        <span title="漲跌以檔案首根開盤至末根收盤計算">收盤價 / 區間漲跌</span>
+      </div>
+      <div class="chain-wrap">
+        <table class="chain-table">
+          <thead>
+            <tr>
+              <th class="call-heading">CALL</th>
+              <th class="strike-heading">履約價</th>
+              <th class="put-heading">PUT</th>
+            </tr>
+          </thead>
+          <tbody id="chainBody"></tbody>
+        </table>
+      </div>
+    </aside>
+
+    <main>
+      <section class="instrument">
+        <div>
+          <div id="chartKind" class="chart-kind">期權 K 線</div>
+          <h2 id="symbolTitle">--</h2>
+          <div id="symbolMeta" class="meta">請從左側期權鏈選擇 CALL 或 PUT</div>
+          <div id="sourceInfo" class="source-info"></div>
+          <div id="finalSessionInfo" class="final-session" hidden></div>
+          <div id="finalSixHoursInfo" class="final-session final-six" hidden></div>
+        </div>
+        <div class="last-price">
+          <strong id="lastPrice">--</strong>
+          <div id="change" class="change">--</div>
+        </div>
+      </section>
+      <section class="cards cross-info" id="crossInfo" aria-live="off"></section><section hidden>
+        <div class="card"><span>區間最高</span><b id="highValue">--</b></div>
+        <div class="card"><span>區間最低</span><b id="lowValue">--</b></div>
+        <div class="card"><span id="volumeLabel">成交量</span><b id="volumeValue">--</b></div>
+        <div class="card"><span>成交筆數</span><b id="tradesValue">--</b></div>
+        <div class="card"><span>最後時間</span><b id="timeValue">--</b></div>
+        <div class="card"><span>K 棒數</span><b id="barsValue">--</b></div>
+      </section>
+      <section class="chart-wrap" id="chartWrap">
+        <div class="chart-tools">
+          <button class="toggle active" data-indicator="ma7">MA7</button>
+          <button class="toggle active" data-indicator="ma20">MA20</button>
+          <button class="toggle" data-indicator="bb">布林</button>
+          <button class="toggle active" data-indicator="highLow">高低價</button>
+          <button class="toggle active" data-indicator="finalSession" title="到期前一天 16:00 至到期日 16:00（台灣時間）">最後 24h</button>
+          <button class="toggle active" data-indicator="finalSixHours" title="到期日前最後 6 小時（台灣時間）">最後 6h</button>
+          <button class="toggle active" data-indicator="volume">成交量</button>
+          <button class="toggle" data-action="latest">回到最新</button>
+          <button class="toggle" data-action="zoomIn" aria-label="放大 K 線">＋</button>
+          <button class="toggle" data-action="zoomOut" aria-label="縮小 K 線">－</button>
+          <button class="toggle" data-action="fit">顯示全部</button>
+          <button class="toggle" data-action="png">存 PNG</button>
+          <button class="toggle" data-action="csv">匯出 CSV</button>
+        </div>
+        <div id="chartStage" class="chart-stage">
+          <canvas id="chart" aria-label="期權 K 線圖，拖曳平移，滾輪縮放，雙擊回到最新"></canvas>
+          <div id="chartMessage" class="chart-message">正在載入行情…</div>
+          
+        </div>
+        <div class="chart-footer"><span id="viewRange">--</span><span id="gestureHelp">拖曳平移 · 滾輪縮放 · 雙擊回到最新</span></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="./static-api.js"></script>
+  <script>
+    const state = {
+      file: "",
+      period: "",
+      periods: [],
+      symbols: [],
+      chain: [],
+      selected: "",
+      rows: [],
+      start: 0,
+      visible: 80,
+      hover: -1,
+      dragging: false,
+      dragX: 0,
+      indicators: { ma7: true, ma20: true, bb: false, highLow: true, volume: true, finalSession: true, finalSixHours: true },
+      expiry: "", favorites: [], mode: "strike", autoRefresh: false,
+      busy: false, metaBusy: false, requestId: 0, controller: null,
+      studies: null, hoverY: null,
+      view: "option",
+    };
+
+    const SETTINGS_KEY = "btc-options-portable-1h-v1";
+    try {
+      const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
+      for (const key of ["file", "period", "selected", "expiry"]) {
+        if (typeof saved[key] === "string") state[key] = saved[key];
+      }
+      if (["strike", "volume", "favorites"].includes(saved.mode)) state.mode = saved.mode;
+      if (["option", "btc"].includes(saved.view)) state.view = saved.view;
+      state.favorites = Array.isArray(saved.favorites) ? saved.favorites.filter((s) => typeof s === "string") : [];
+      state.autoRefresh = saved.autoRefresh === true;
+      for (const key of Object.keys(state.indicators)) {
+        if (typeof saved.indicators?.[key] === "boolean") state.indicators[key] = saved.indicators[key];
+      }
+    } catch { /* Storage can be unavailable in a private browser session. */ }
+
+    function saveSettings() {
+      const { file, period, selected, expiry, mode, favorites, autoRefresh, indicators, view } = state;
+      try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ file, period, selected, expiry, mode, favorites, autoRefresh, indicators, view })); } catch {}
+    }
+
+    const $ = (id) => document.getElementById(id);
+    const ui = {
+      file: $("fileSelect"),
+      period: $("periodSelect"),
+      expiry: $("expirySelect"),
+      mode: $("chainMode"),
+      search: $("search"),
+      chain: $("chainBody"),
+      count: $("chainCount"),
+      status: $("status"),
+      chart: $("chart"),
+      wrap: $("chartWrap"),
+
+    };
+    const ctx = ui.chart.getContext("2d");
+    const mobileLayout = window.matchMedia("(max-width: 760px), (max-width: 980px) and (pointer: coarse)");
+    function setMobileView(view) {
+      document.querySelector(".layout").dataset.mobileView = view;
+      $("mobileChain").setAttribute("aria-pressed", String(view === "chain"));
+      $("mobileChart").setAttribute("aria-pressed", String(view === "chart"));
+      hideTooltip();
+      requestAnimationFrame(resizeAndDraw);
+    }
+    function updateMobileHelp() {
+      $("gestureHelp").textContent = mobileLayout.matches ? "單指拖曳 · 雙指縮放 · 輕點查看價格" : "拖曳平移 · 滾輪縮放 · 雙擊回到最新";
+      resizeAndDraw();
+    }
+    mobileLayout.addEventListener("change", updateMobileHelp);
+    $("mobileChain").addEventListener("click", () => setMobileView("chain"));
+    $("mobileChart").addEventListener("click", () => setMobileView("chart"));
+    $("mobilePeriod").addEventListener("change", () => {
+      ui.period.value = $("mobilePeriod").value;
+      ui.period.dispatchEvent(new Event("change"));
+    });
+    $("mobileRefresh").addEventListener("click", () => loadMeta({ preserveFile: true, preserveView: true }));
+    const fmt = (n, digits = state.view === "btc" ? 3 : 0) => Number(n || 0).toLocaleString("zh-TW", { maximumFractionDigits: digits });
+    const compact = (n) => Intl.NumberFormat("zh-TW", { notation: "compact", maximumFractionDigits: 2 }).format(Number(n || 0));
+    const pct = (n) => `${n >= 0 ? "+" : ""}${Number(n || 0).toFixed(1)}%`;
+    const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+
+    async function getJson(url, controller) {
+      if (location.hostname.endsWith("github.io")) return window.btcStaticApi(url, controller);
+      const timeout = setTimeout(() => controller.abort(), url.startsWith("/api/btc-klines") ? 50000 : 15000);
+      try {
+        const res = await fetch(url, { cache: "no-store", signal: controller.signal });
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.message || "API 讀取失敗");
+        return data;
+      } finally { clearTimeout(timeout); }
+    }
+
+    function beginRequest() {
+      state.controller?.abort();
+      state.controller = new AbortController();
+      state.busy = true;
+      return { id: ++state.requestId, controller: state.controller };
+    }
+
+    function clearChart(message = "正在載入行情…") {
+      state.rows = [];
+      state.studies = null;
+      $("finalSessionInfo").hidden = true;
+      $("finalSixHoursInfo").hidden = true;
+      hideTooltip();
+      $("chartMessage").textContent = message;
+      $("chartMessage").hidden = false;
+      for (const id of ["lastPrice", "change", "highValue", "lowValue", "volumeValue", "tradesValue", "timeValue", "barsValue", "viewRange"]) $(id).textContent = "--";
+      $("symbolTitle").textContent = state.view === "btc" ? "BTC / USD" : state.selected || "--";
+      $("chartKind").textContent = state.view === "btc" ? "BTC 現貨 · 技術分析" : "期權 K 線";
+      $("volumeLabel").textContent = state.view === "btc" ? "成交量（BTC）" : "成交量";
+      $("sourceInfo").textContent = "";
+      $("symbolMeta").textContent = "";
+      resizeAndDraw();
+    }
+
+    async function loadMeta({ preserveFile = false, preserveView = false } = {}) {
+      const request = beginRequest();
+      state.metaBusy = true;
+      if (!preserveView) clearChart();
+      ui.status.className = "status";
+      ui.status.textContent = "正在讀取 1h 精簡資料...";
+      const requested = preserveFile && state.file ? `?file=${encodeURIComponent(state.file)}` : "";
+      try {
+      const data = await getJson(`/api/meta${requested}`, request.controller);
+      if (request.id !== state.requestId) return;
+      state.file = data.file.name;
+      state.fileInfo = data.file;
+      state.symbols = data.symbols || [];
+      state.chain = data.chain || [];
+      state.periods = data.periods || [data.file.interval, "4h"];
+      if (!state.periods.includes(state.period)) state.period = data.file.interval;
+      const expiries = data.expiries || [...new Set(state.symbols.map((s) => s.expiryDate))].sort();
+      if (state.expiry !== "all" && !expiries.includes(state.expiry)) {
+        state.expiry = state.symbols.find((s) => s.symbol === state.selected)?.expiryDate || expiries[0] || "all";
+      }
+      ui.expiry.innerHTML = `<option value="all">全部到期日</option>` + expiries.map((expiry) => `<option value="${esc(expiry)}">${esc(expiry)}</option>`).join("");
+      ui.expiry.value = state.expiry;
+      ui.mode.value = state.mode;
+      $("sourceInfo").textContent = `到期日 ${data.file.date} · 前兩天＋當天 ${data.file.firstDate} ～ ${data.file.lastDate} · 檔案更新 ${new Date(data.file.modifiedAt).toLocaleString("zh-TW", { hour12: false, timeZone: "Asia/Taipei" })} · 台北時間${data.file.missingDates?.length ? ` · 缺來源 ${data.file.missingDates.join("、")}` : ""}`;
+
+      ui.file.innerHTML = data.files.map((file) =>
+        `<option value="${esc(file.name)}" ${file.name === state.file ? "selected" : ""}>${file.date} 到期 ｜ ${file.sourceDays} 個交易日</option>`
+      ).join("");
+      ui.period.innerHTML = state.periods.map((period) =>
+        `<option value="${period}" ${period === state.period ? "selected" : ""}>${period.toUpperCase()}</option>`
+      ).join("");
+      $("mobilePeriod").innerHTML = ui.period.innerHTML;
+
+      ui.status.className = "status ok";
+      ui.status.textContent = `${data.rowCount.toLocaleString()} 筆 ｜ ${data.symbolCount} 合約 ｜ ${data.file.date} ${data.file.interval}`;
+      renderChain();
+
+      state.metaBusy = false;
+      const available = state.symbols.filter((s) => state.expiry === "all" || s.expiryDate === state.expiry);
+      if (!available.some((item) => item.symbol === state.selected)) {
+        const mostActive = [...available].sort((a, b) => b.volume - a.volume)[0];
+        if (mostActive) await selectSymbol(mostActive.symbol, { view: state.view });
+        else { state.selected = ""; clearChart("所選日期及前兩天的資料中，沒有此日期到期的合約，請選其他日期"); saveSettings(); }
+      } else {
+        await selectSymbol(state.selected, { preserveView, view: state.view });
+      }
+      } catch (error) {
+        if (request.id === state.requestId) showError(error);
+      } finally {
+        if (request.id === state.requestId) { state.busy = false; state.metaBusy = false; }
+      }
+    }
+
+    function renderChain() {
+      const q = ui.search.value.trim().toLowerCase();
+      const rows = state.chain.filter((row) => {
+        if (state.expiry !== "all" && row.expiryDate !== state.expiry) return false;
+        if (state.mode === "favorites" && ![row.call, row.put].some((s) => s && state.favorites.includes(s.symbol))) return false;
+        const text = [
+          row.strikePrice,
+          row.expiryDate,
+          row.call?.symbol,
+          row.put?.symbol,
+        ].filter(Boolean).join(" ").toLowerCase();
+        return !q || text.includes(q);
+      });
+      if (state.mode === "volume") rows.sort((a, b) => ((b.call?.volume || 0) + (b.put?.volume || 0)) - ((a.call?.volume || 0) + (a.put?.volume || 0)));
+      ui.count.textContent = `(${rows.length})`;
+      ui.chain.innerHTML = rows.map((row) => `
+        <tr>
+          ${quoteCell(row.call, "call")}
+          <td class="strike">${strikeButton(row)}</td>
+          ${quoteCell(row.put, "put")}
+        </tr>
+      `).join("") || `<tr><td colspan="3"><div class="empty">${state.mode === "favorites" ? "此篩選下尚無自選合約，點選報價旁的 ☆ 即可加入。" : "沒有符合條件的期權，試著更換到期日或清除搜尋。"}</div></td></tr>`;
+    }
+
+    function quoteCell(item, sideClass) {
+      if (!item) return `<td class="quote ${sideClass}"><div class="subline">--</div></td>`;
+      const direction = item.changePct >= 0 ? "up" : "down";
+      return `
+        <td class="quote ${sideClass} ${state.view === "option" && item.symbol === state.selected ? "active" : ""}" data-symbol="${esc(item.symbol)}" title="${esc(item.symbol)}" tabindex="0" aria-label="選擇 ${esc(item.symbol)}">
+          <div class="price-line">
+            <span class="last">${fmt(item.close, 0)}</span>
+            <span class="chg ${direction}">${pct(item.changePct)}</span>
+          </div>
+          <div class="subline"><button class="star ${state.favorites.includes(item.symbol) ? "saved" : ""}" data-star="${esc(item.symbol)}" aria-label="自選 ${esc(item.symbol)}" aria-pressed="${state.favorites.includes(item.symbol)}">${state.favorites.includes(item.symbol) ? "★" : "☆"}</button>量 ${item.volume == null ? "--" : compact(item.volume)} ｜ ${item.count} 根</div>
+        </td>
+      `;
+    }
+
+    function strikeButton(row) {
+      const reference = [row.call, row.put].find((item) => item?.symbol === state.selected) || row.call || row.put;
+      if (!reference) return fmt(row.strikePrice, 0);
+      const active = state.view === "btc" && [row.call, row.put].some((item) => item?.symbol === state.selected);
+      return `<button class="strike-button ${active ? "active" : ""}" data-btc-symbol="${esc(reference.symbol)}" aria-pressed="${active}" title="查看 ${esc(row.expiryDate)} 到期、履約價 ${fmt(row.strikePrice, 0)} 對應時段的 BTC/USD K 線">${fmt(row.strikePrice, 0)}${state.expiry === "all" ? `<small>${esc(row.expiryDate)}</small>` : ""}<span class="btc-hint">${active ? "BTC 顯示中" : "BTC/USD"}</span></button>`;
+    }
+
+    async function selectSymbol(symbol, { preserveView = false, view = "option" } = {}) {
+      if (state.metaBusy) return;
+      preserveView = preserveView && state.rows.length > 0 && state.view === view && state.selected === symbol;
+      const request = beginRequest();
+      const oldStart = state.start;
+      const oldVisible = state.visible;
+      const atEnd = state.start + state.visible >= state.rows.length;
+      state.selected = symbol;
+      state.view = view;
+      if (!preserveView) clearChart();
+      else hideTooltip();
+      renderChain();
+      ui.status.className = "status";
+      const chartSymbol = view === "btc" ? "BTC/USD" : symbol;
+      ui.status.textContent = `讀取 ${chartSymbol} ${state.period.toUpperCase()}${view === "btc" ? " · 契約對應時段" : ""}...`;
+      try {
+        const route = view === "btc" ? "/api/btc-klines" : "/api/klines";
+        const data = await getJson(`${route}?file=${encodeURIComponent(state.file)}&symbol=${encodeURIComponent(symbol)}&period=${encodeURIComponent(state.period)}`, request.controller);
+        if (request.id !== state.requestId) return;
+        state.rows = data.items || [];
+        state.studies = { ma7: movingAverage(state.rows, 7), ma20: movingAverage(state.rows, 20), bb: bollinger(state.rows) };
+        state.visible = Math.min(state.rows.length, preserveView && oldVisible > 0 ? oldVisible : defaultVisible());
+        state.start = preserveView && !atEnd ? Math.max(0, Math.min(oldStart, state.rows.length - state.visible)) : Math.max(0, state.rows.length - state.visible);
+        $("chartMessage").hidden = state.rows.length > 0;
+        $("chartMessage").textContent = "此合約沒有可顯示的 K 線";
+        if (!state.rows.length) clearChart("此合約沒有可顯示的 K 線");
+        updateSummary(data);
+        resizeAndDraw();
+        ui.status.className = "status ok";
+        ui.status.textContent = `${chartSymbol} ｜ ${data.period.toUpperCase()} ｜ ${data.count} 根 K 棒`;
+        saveSettings();
+      } catch (error) {
+        if (request.id === state.requestId) {
+          clearChart("載入失敗，請按「重讀」重試");
+          showError(error);
+        }
+      } finally {
+        if (request.id === state.requestId) state.busy = false;
+      }
+    }
+
+    function updateSummary(data) {
+      const rows = state.rows;
+      const info = state.symbols.find((item) => item.symbol === state.selected);
+      if (!rows.length || !info) return;
+      const first = rows[0];
+      const last = rows.at(-1);
+      const change = first.open ? ((last.close / first.open) - 1) * 100 : 0;
+      const isBtc = data.market === "btc";
+      $("symbolTitle").textContent = isBtc ? "BTC / USD" : state.selected;
+      $("chartKind").textContent = isBtc ? "BTC 現貨 · 技術分析" : "期權 K 線";
+      $("volumeLabel").textContent = isBtc ? "成交量（BTC）" : "成交量";
+      $("symbolMeta").textContent = `到期 ${info.expiryDate} ｜ 履約價 ${fmt(info.strikePrice, 0)} ｜ ${isBtc ? "對應時段 BTC 現貨" : info.side} ｜ ${data.period.toUpperCase()}${data.period !== data.sourceInterval ? `（由 ${data.sourceInterval} 聚合）` : ""}`;
+      $("sourceInfo").textContent = isBtc
+        ? `${data.provider} · 契約資料 ${data.range.optionStart} ～ ${data.range.optionEnd} · 台北時間${data.missingSourceBars ? ` · 來源缺少 ${data.missingSourceBars} 根 K 棒` : ""}`
+        : `到期日 ${data.file.date} · 前兩天＋當天 ${data.file.firstDate} ～ ${data.file.lastDate} · 檔案更新 ${new Date(data.file.modifiedAt).toLocaleString("zh-TW", { hour12: false, timeZone: "Asia/Taipei" })} · 台北時間${data.file.missingDates?.length ? ` · 缺來源 ${data.file.missingDates.join("、")}` : ""}`;
+      $("lastPrice").textContent = fmt(last.close);
+      $("lastPrice").style.color = change >= 0 ? "var(--up)" : "var(--down)";
+      $("change").textContent = `${change >= 0 ? "+" : ""}${change.toFixed(2)}%（目前載入區間）`;
+      $("change").style.color = change >= 0 ? "var(--up)" : "var(--down)";
+      $("highValue").textContent = fmt(Math.max(...rows.map((r) => r.high)));
+      $("lowValue").textContent = fmt(Math.min(...rows.map((r) => r.low)));
+      $("volumeValue").textContent = fmt(rows.reduce((sum, r) => sum + r.volume, 0), 2);
+      $("tradesValue").textContent = isBtc ? "--" : fmt(rows.reduce((sum, r) => sum + r.trades, 0), 0);
+      $("tradesValue").title = isBtc ? "Coinbase K 線 API 未提供成交筆數" : "";
+      $("timeValue").textContent = last.time.slice(5, 16);
+      $("barsValue").textContent = rows.length.toLocaleString();
+      renderCrossInfo(last);
+    }
+
+    function movingAverage(rows, period) {
+      const result = Array(rows.length).fill(null);
+      let sum = 0;
+      for (let i = 0; i < rows.length; i += 1) {
+        sum += rows[i].close;
+        if (i >= period) sum -= rows[i - period].close;
+        if (i >= period - 1) result[i] = sum / period;
+      }
+      return result;
+    }
+
+    function bollinger(rows, period = 20) {
+      const mid = movingAverage(rows, period);
+      return rows.map((_, i) => {
+        if (i < period - 1) return null;
+        const values = rows.slice(i - period + 1, i + 1).map((r) => r.close);
+        const variance = values.reduce((sum, value) => sum + (value - mid[i]) ** 2, 0) / period;
+        const sd = Math.sqrt(variance);
+        return { upper: mid[i] + 2 * sd, lower: mid[i] - 2 * sd };
+      });
+    }
+
+    function finalSessionWindow() {
+      const expiry = state.symbols.find((item) => item.symbol === state.selected)?.expiryDate;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(expiry || "")) return null;
+      const end = Date.parse(`${expiry}T16:00:00+08:00`);
+      if (!Number.isFinite(end)) return null;
+      return { start: end - 24 * 3600000, end };
+    }
+
+    function finalSixHoursWindow() {
+      const expiry = state.symbols.find((item) => item.symbol === state.selected)?.expiryDate;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(expiry || "")) return null;
+      const end = Date.parse(`${expiry}T16:00:00+08:00`);
+      if (!Number.isFinite(end)) return null;
+      return { start: end - 6 * 3600000, end };
+    }
+
+    function barTaiwanTime(row) {
+      return Date.parse(String(row.time).replace(" ", "T") + "+08:00");
+    }
+
+    function taiwanTimeLabel(time) {
+      return new Date(time + 8 * 3600000).toISOString().slice(0, 16).replace("T", " ");
+    }
+
+    function drawFinalSession(rows, left, top, plotW, chartBottom) {
+      const session = finalSessionWindow();
+      const caption = $("finalSessionInfo");
+      caption.hidden = !session || !state.indicators.finalSession;
+      if (caption.hidden) return;
+      const duration = ({ "15m": 15, "1h": 60, "4h": 240 }[state.period] || 60) * 60000;
+      const overlaps = (row) => {
+        const time = barTaiwanTime(row);
+        return time < session.end && time + duration > session.start;
+      };
+      const hasVisible = rows.some(overlaps);
+      const hasLoaded = hasVisible || state.rows.some(overlaps);
+      caption.textContent = `最後 24 小時 · ${taiwanTimeLabel(session.start)} ～ ${taiwanTimeLabel(session.end)}（台灣時間）${!hasLoaded ? " · 載入資料尚無此區間" : !hasVisible ? " · 此區間在目前視窗外" : ""}`;
+      if (!hasVisible) return;
+      const step = plotW / rows.length;
+      ctx.save();
+      ctx.fillStyle = "rgba(245,185,66,.10)";
+      rows.forEach((row, i) => {
+        const time = barTaiwanTime(row);
+        if (!Number.isFinite(time) || !overlaps(row)) return;
+        const from = Math.max(0, (session.start - time) / duration);
+        const to = Math.min(1, (session.end - time) / duration);
+        ctx.fillRect(left + (i + from) * step, top, (to - from) * step, chartBottom - top);
+      });
+      // Place a boundary only where a loaded candle actually reaches that time.
+      // Missing candles and off-screen boundaries are never invented.
+      const boundaryX = (time) => {
+        const index = rows.findIndex((row) => {
+          const start = barTaiwanTime(row);
+          return time >= start && time <= start + duration;
+        });
+        return index < 0 ? null : left + (index + (time - barTaiwanTime(rows[index])) / duration) * step;
+      };
+      let lastLabelRight = -Infinity;
+      for (const [time, label] of [[session.start, "起"], [session.end, "迄"]]) {
+        const px = boundaryX(time);
+        if (px === null) continue;
+        ctx.strokeStyle = "rgba(245,185,66,.8)";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([5, 4]);
+        ctx.beginPath();
+        ctx.moveTo(px, top);
+        ctx.lineTo(px, chartBottom);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        const text = `${label} ${taiwanTimeLabel(time).slice(5)}`;
+        ctx.font = "11px Segoe UI, Microsoft JhengHei";
+        const width = ctx.measureText(text).width;
+        const textX = Math.max(left, Math.min(left + plotW - width, px + 4));
+        if (textX < lastLabelRight + 8) continue;
+        ctx.fillStyle = "#f5b942";
+        ctx.textAlign = "left";
+        ctx.fillText(text, textX, top - 5);
+        lastLabelRight = textX + width;
+      }
+      ctx.restore();
+    }
+
+    function drawFinalSixHours(rows, left, top, plotW, chartBottom) {
+      const session = finalSixHoursWindow();
+      const caption = $("finalSixHoursInfo");
+      caption.hidden = !session || !state.indicators.finalSixHours;
+      if (caption.hidden) return;
+      const duration = ({ "15m": 15, "1h": 60, "4h": 240 }[state.period] || 60) * 60000;
+      const overlaps = (row) => {
+        const time = barTaiwanTime(row);
+        return time < session.end && time + duration > session.start;
+      };
+
+      const hasVisible = rows.some(overlaps);
+      const hasLoaded = hasVisible || state.rows.some(overlaps);
+      caption.textContent = `最後 6 小時 · ${taiwanTimeLabel(session.start)} ～ ${taiwanTimeLabel(session.end)}（台灣時間）${!hasLoaded ? " · 載入資料尚無此區間" : !hasVisible ? " · 此區間在目前視窗外" : ""}`;
+      if (!hasVisible) return;
+
+      const step = plotW / rows.length;
+      ctx.save();
+      // 6h 採較低透明度，疊在 24h 上仍可辨識但不遮住 K 棒。
+      ctx.fillStyle = "rgba(157,123,255,.055)";
+      rows.forEach((row, i) => {
+        const time = barTaiwanTime(row);
+        if (!Number.isFinite(time) || !overlaps(row)) return;
+        const from = Math.max(0, (session.start - time) / duration);
+        const to = Math.min(1, (session.end - time) / duration);
+        ctx.fillRect(left + (i + from) * step, top, (to - from) * step, chartBottom - top);
+      });
+
+      const boundaryX = (time) => {
+        const index = rows.findIndex((row) => {
+          const start = barTaiwanTime(row);
+          return time >= start && time <= start + duration;
+        });
+        return index < 0 ? null : left + (index + (time - barTaiwanTime(rows[index])) / duration) * step;
+      };
+
+      const boundaries = state.indicators.finalSession
+        ? [[session.start, "6h 起"]]
+        : [[session.start, "6h 起"], [session.end, "迄"]];
+      for (const [time, label] of boundaries) {
+        const px = boundaryX(time);
+        if (px === null) continue;
+        ctx.strokeStyle = "rgba(157,123,255,.72)";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(px, top);
+        ctx.lineTo(px, chartBottom);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        const text = `${label} ${taiwanTimeLabel(time).slice(5)}`;
+        ctx.font = "11px Segoe UI, Microsoft JhengHei";
+        const width = ctx.measureText(text).width;
+        const textX = Math.max(left, Math.min(left + plotW - width, px + 4));
+        ctx.fillStyle = "#9d7bff";
+        ctx.textAlign = "left";
+        ctx.fillText(text, textX, top + 13);
+      }
+      ctx.restore();
+    }
+
+    function resizeAndDraw() {
+      const rect = $("chartStage").getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      ui.chart.width = Math.max(1, Math.round(rect.width * dpr));
+      ui.chart.height = Math.max(1, Math.round(rect.height * dpr));
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw();
+    }
+
+    function draw() {
+      const w = ui.chart.clientWidth;
+      const h = ui.chart.clientHeight;
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = "#111823";
+      ctx.fillRect(0, 0, w, h);
+      if (!state.rows.length || w < 120 || h < 100) return;
+
+      const left = 12;
+      const right = 72;
+      const top = 18;
+      const bottom = 27;
+      const volumeHeight = state.indicators.volume ? Math.min(105, h * .2) : 0;
+      const priceBottom = h - bottom - volumeHeight;
+      state.visible = Math.min(state.visible, state.rows.length);
+      state.start = Math.max(0, Math.min(state.start, state.rows.length - state.visible));
+      const end = state.start + state.visible;
+      const rows = state.rows.slice(state.start, end);
+      const allMa7 = state.studies.ma7;
+      const allMa20 = state.studies.ma20;
+      const allBb = state.studies.bb;
+      $("viewRange").textContent = `${rows[0].time.slice(5, 16)} → ${rows.at(-1).time.slice(5, 16)} · ${rows.length} / ${state.rows.length} 根`;
+      const values = rows.flatMap((r) => [r.high, r.low]);
+      if (state.indicators.ma7) values.push(...allMa7.slice(state.start, end).filter(Number.isFinite));
+      if (state.indicators.ma20) values.push(...allMa20.slice(state.start, end).filter(Number.isFinite));
+      if (state.indicators.bb) allBb.slice(state.start, end).filter(Boolean).forEach((b) => values.push(b.upper, b.lower));
+
+      let min = Math.min(...values);
+      let max = Math.max(...values);
+      const padding = Math.max((max - min) * .08, max * .005, .01);
+      min = Math.max(0, min - padding);
+      max += padding;
+      const plotW = w - left - right;
+      const plotH = priceBottom - top;
+      const x = (i) => left + (i + .5) * plotW / rows.length;
+      const y = (value) => top + (max - value) / (max - min || 1) * plotH;
+
+      drawFinalSession(rows, left, top, plotW, h - bottom);
+      drawFinalSixHours(rows, left, top, plotW, h - bottom);
+
+      ctx.strokeStyle = "#202b3b";
+      ctx.lineWidth = 1;
+      ctx.fillStyle = "#718096";
+      ctx.font = "11px Segoe UI";
+      ctx.textAlign = "left";
+      for (let i = 0; i <= 5; i += 1) {
+        const gy = top + plotH * i / 5;
+        ctx.beginPath();
+        ctx.moveTo(left, gy);
+        ctx.lineTo(w - right, gy);
+        ctx.stroke();
+        ctx.fillText(fmt(max - (max - min) * i / 5), w - right + 8, gy + 4);
+      }
+      const labelEvery = Math.max(1, Math.ceil(rows.length / Math.max(1, Math.floor(plotW / 100))));
+      rows.forEach((row, i) => {
+        if (i % labelEvery !== 0) return;
+        const gx = x(i);
+        ctx.beginPath();
+        ctx.moveTo(gx, top);
+        ctx.lineTo(gx, h - bottom);
+        ctx.stroke();
+        ctx.textAlign = "center";
+        ctx.fillText(row.time.slice(5, 16), gx, h - 8);
+      });
+
+      const step = plotW / rows.length;
+      const candleW = Math.max(.5, step * .94);
+      rows.forEach((row, i) => {
+        const cx = x(i);
+        const color = row.close >= row.open ? "#ea3943" : "#16c784";
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+        ctx.lineWidth = Math.min(candleW, Math.max(1, Math.min(3, candleW * .14)));
+        ctx.beginPath();
+        ctx.moveTo(cx, y(row.high));
+        ctx.lineTo(cx, y(row.low));
+        ctx.stroke();
+        const bodyTop = y(Math.max(row.open, row.close));
+        const bodyHeight = Math.max(2, Math.abs(y(row.open) - y(row.close)));
+        ctx.fillRect(cx - candleW / 2, bodyTop, candleW, bodyHeight);
+      });
+
+      function line(valuesToDraw, color, width = 1.5) {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        ctx.beginPath();
+        let started = false;
+        valuesToDraw.forEach((value, i) => {
+          if (!Number.isFinite(value)) {
+            started = false;
+            return;
+          }
+          if (!started) {
+            ctx.moveTo(x(i), y(value));
+            started = true;
+          } else {
+            ctx.lineTo(x(i), y(value));
+          }
+        });
+        ctx.stroke();
+      }
+      if (state.indicators.ma7) line(allMa7.slice(state.start, end), "#f5b942");
+      if (state.indicators.ma20) line(allMa20.slice(state.start, end), "#42c8f5");
+      if (state.indicators.bb) {
+        line(allBb.slice(state.start, end).map((b) => b?.upper), "#9d7bff", 1);
+        line(allBb.slice(state.start, end).map((b) => b?.lower), "#9d7bff", 1);
+      }
+
+      function drawPriceTag(index, value, label, color, placeAbove) {
+        const px = x(index);
+        const py = y(value);
+        const text = `${label} ${fmt(value)}`;
+        ctx.save();
+        ctx.font = "700 12px Segoe UI";
+        const boxW = Math.ceil(ctx.measureText(text).width) + 14;
+        const boxH = 22;
+        let boxX = px + 10;
+        if (boxX + boxW > w - right - 4) boxX = px - boxW - 10;
+        if (boxX < left + 4) boxX = left + 4;
+        let boxY = placeAbove ? py - boxH - 8 : py + 8;
+        if (boxY < top + 4) boxY = py + 8;
+        if (boxY + boxH > priceBottom - 4) boxY = py - boxH - 8;
+        boxY = Math.max(top + 4, Math.min(priceBottom - boxH - 4, boxY));
+
+        const lineEndX = boxX > px ? boxX : boxX + boxW;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        ctx.lineTo(lineEndX, py);
+        ctx.stroke();
+
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(px, py, 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "rgba(9,13,20,.92)";
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1;
+        ctx.fillRect(boxX, boxY, boxW, boxH);
+        ctx.strokeRect(boxX + .5, boxY + .5, boxW - 1, boxH - 1);
+        ctx.fillStyle = color;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(text, boxX + boxW / 2, boxY + boxH / 2 + .5);
+        ctx.restore();
+      }
+
+      if (state.indicators.highLow && rows.length) {
+        let highIndex = 0;
+        let lowIndex = 0;
+        rows.forEach((row, i) => {
+          if (row.high > rows[highIndex].high) highIndex = i;
+          if (row.low < rows[lowIndex].low) lowIndex = i;
+        });
+        drawPriceTag(highIndex, rows[highIndex].high, "最高", "#ea3943", true);
+        drawPriceTag(lowIndex, rows[lowIndex].low, "最低", "#16c784", false);
+      }
+
+      if (volumeHeight) {
+        const volumeTop = priceBottom + 12;
+        const maxVolume = Math.max(1, ...rows.map((r) => r.volume));
+        ctx.fillStyle = "#718096";
+        ctx.textAlign = "left";
+        ctx.fillText(`成交量 最大 ${fmt(maxVolume, 2)}`, left, volumeTop + 2);
+        rows.forEach((row, i) => {
+          const barH = (row.volume / maxVolume) * (volumeHeight - 24);
+          ctx.fillStyle = row.close >= row.open ? "rgba(234,57,67,.62)" : "rgba(22,199,132,.62)";
+          ctx.fillRect(x(i) - candleW / 2, h - bottom - barH, candleW, barH);
+        });
+      }
+
+      if (state.hover >= state.start && state.hover < end) {
+        const local = state.hover - state.start;
+        const cx = x(local);
+        const cy = Math.max(top, Math.min(priceBottom, state.hoverY ?? top));
+        ctx.strokeStyle = "#8795aa";
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(cx, top);
+        ctx.lineTo(cx, h - bottom);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(left, cy);
+        ctx.lineTo(w - right, cy);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = "#344154";
+        ctx.fillRect(w - right, cy - 10, right, 20);
+        ctx.fillStyle = "#e6edf7";
+        ctx.textAlign = "left";
+        ctx.fillText(fmt(max - (cy - top) / plotH * (max - min)), w - right + 5, cy + 4);
+      }
+    }
+
+    function renderCrossInfo(row) {
+      const price = value => value == null ? "--" : fmt(value);
+      const value = (number, digits) => number == null ? "--" : fmt(number, digits);
+      const pointChange = row ? row.close - row.open : null;
+      const change = row?.open ? (row.close / row.open - 1) * 100 : null;
+      const fields = [
+        ["時間 · " + state.period.toUpperCase(), row ? esc(row.time) : "--", ""],
+        ["開", row ? price(row.open) : "--", ""],
+        ["高", row ? price(row.high) : "--", "up"],
+        ["低", row ? price(row.low) : "--", "down"],
+        ["收", row ? price(row.close) : "--", row && row.close >= row.open ? "up" : "down"],
+        ["漲跌", pointChange == null ? "--" : `${pointChange >= 0 ? "+" : ""}${fmt(pointChange)}${change == null ? "（--）" : `（${change >= 0 ? "+" : ""}${change.toFixed(2)}%）`}`, pointChange >= 0 ? "up" : "down"],
+        [state.view === "btc" ? "成交量 BTC" : "成交量", row ? value(row.volume, 2) : "--", ""],
+        [state.view === "btc" ? "高低價差" : "成交筆數", row ? (state.view === "btc" ? price(row.high - row.low) : value(row.trades, 0)) : "--", ""],
+      ];
+      $("crossInfo").innerHTML = fields.map(([label, content, color]) => `<div class="card"><span>${label}</span><b class="${color ? "chg " + color : ""}">${content}</b></div>`).join("");
+    }
+    function showTooltip(event) {
+      if (!state.rows.length) return;
+      const rect = ui.chart.getBoundingClientRect();
+      const left = 12;
+      const right = 72;
+      const localX = event.clientX - rect.left;
+      const index = Math.floor((localX - left) / (rect.width - left - right) * state.visible);
+      if (index < 0 || index >= state.visible) {
+        hideTooltip();
+        draw();
+        return;
+      }
+      state.hover = state.start + index;
+      state.hoverY = event.clientY - rect.top;
+      const row = state.rows[state.hover];
+      if (!row) return;
+      renderCrossInfo(row);
+      draw();
+    }
+
+    function hideTooltip() {
+      state.hover = -1;
+      state.hoverY = null;
+      renderCrossInfo(state.rows.at(-1));
+    }
+
+    function defaultVisible() {
+      return Math.max(15, Math.min(80, Math.floor((ui.chart.clientWidth - 84) / 11)));
+    }
+
+    function latest() {
+      state.visible = Math.min(state.rows.length, defaultVisible());
+      state.start = Math.max(0, state.rows.length - state.visible);
+      hideTooltip();
+      draw();
+    }
+
+    function zoom(delta, ratio = .5) {
+      if (!state.rows.length) return;
+      const old = state.visible;
+      const next = Math.min(state.rows.length, Math.max(Math.min(8, state.rows.length), old + delta));
+      const anchor = state.start + Math.floor(old * ratio);
+      state.visible = next;
+      state.start = Math.max(0, Math.min(state.rows.length - next, anchor - Math.floor(next * ratio)));
+      hideTooltip();
+      draw();
+    }
+
+    function exportCsv() {
+      if (!state.rows.length) return;
+      const keys = ["time", "open", "high", "low", "close", "volume", "quoteVolume", "trades"];
+      const csv = [keys, ...state.rows.map((row) => keys.map((key) => row[key]))].map((row) => row.map((value) => `"${String(value ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n");
+      const url = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${state.view === "btc" ? "BTC-USD_" : ""}${state.selected}-${state.period}-${state.fileInfo.date}.csv`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    ui.file.addEventListener("change", async () => {
+      state.file = ui.file.value;
+      state.selected = "";
+      $("sourceInfo").textContent = "";
+      await loadMeta({ preserveFile: true }).catch(showError);
+    });
+    ui.period.addEventListener("change", async () => {
+      state.period = ui.period.value;
+      $("mobilePeriod").value = state.period;
+      if (state.selected) await selectSymbol(state.selected, { view: state.view });
+    });
+    ui.expiry.addEventListener("change", () => {
+      state.expiry = ui.expiry.value;
+      saveSettings();
+      renderChain();
+      if (state.expiry !== "all" && !state.symbols.some((s) => s.symbol === state.selected && s.expiryDate === state.expiry)) {
+        const next = state.symbols.filter((s) => s.expiryDate === state.expiry).sort((a, b) => b.volume - a.volume)[0];
+        if (next) selectSymbol(next.symbol, { view: state.view });
+      }
+    });
+    ui.mode.addEventListener("change", () => { state.mode = ui.mode.value; saveSettings(); renderChain(); });
+    ui.search.addEventListener("input", renderChain);
+    ui.chain.addEventListener("click", (event) => {
+      const strike = event.target.closest("[data-btc-symbol]");
+      if (strike) {
+        if (mobileLayout.matches) setMobileView("chart");
+        selectSymbol(strike.dataset.btcSymbol, { view: "btc" }); return;
+      }
+      const star = event.target.closest("[data-star]");
+      if (star) {
+        const symbol = star.dataset.star;
+        state.favorites = state.favorites.includes(symbol) ? state.favorites.filter((s) => s !== symbol) : [...state.favorites, symbol];
+        saveSettings();
+        renderChain();
+        return;
+      }
+      const cell = event.target.closest("[data-symbol]");
+      if (cell) {
+        if (mobileLayout.matches) setMobileView("chart");
+        selectSymbol(cell.dataset.symbol);
+      }
+    });
+    ui.chain.addEventListener("keydown", (event) => {
+      if (["Enter", " "].includes(event.key) && event.target.matches("td[data-symbol]")) { event.preventDefault(); event.target.click(); }
+    });
+    $("refresh").addEventListener("click", () => loadMeta({ preserveFile: true, preserveView: true }));
+    function updateAutoButton() {
+      $("autoRefresh").textContent = `自動重讀：${state.autoRefresh ? "30 秒" : "關"}`;
+      $("autoRefresh").setAttribute("aria-pressed", String(state.autoRefresh));
+    }
+    $("autoRefresh").addEventListener("click", () => { state.autoRefresh = !state.autoRefresh; saveSettings(); updateAutoButton(); });
+    $("focusChart").addEventListener("click", () => {
+      const focus = document.querySelector(".layout").classList.toggle("focus");
+      $("focusChart").textContent = focus ? "顯示期權鏈" : "專注看盤";
+      $("focusChart").setAttribute("aria-pressed", String(focus));
+      hideTooltip();
+      resizeAndDraw();
+    });
+    setInterval(() => {
+      if (state.autoRefresh && !state.busy && !state.dragging && !document.hidden) loadMeta({ preserveFile: true, preserveView: true });
+    }, 30000);
+    ui.wrap.addEventListener("click", (event) => {
+      const button = event.target.closest(".toggle");
+      if (!button) return;
+      if (button.dataset.indicator) {
+        const key = button.dataset.indicator;
+        state.indicators[key] = !state.indicators[key];
+        button.classList.toggle("active", state.indicators[key]);
+        button.setAttribute("aria-pressed", String(state.indicators[key]));
+        saveSettings();
+        draw();
+      } else if (button.dataset.action === "fit") {
+        state.visible = state.rows.length;
+        state.start = 0;
+        hideTooltip();
+        draw();
+      } else if (button.dataset.action === "latest") {
+        latest();
+      } else if (button.dataset.action === "zoomIn") {
+        zoom(-10);
+      } else if (button.dataset.action === "zoomOut") {
+        zoom(10);
+      } else if (button.dataset.action === "csv") {
+        exportCsv();
+      } else if (button.dataset.action === "png") {
+        if (!state.rows.length) return;
+        hideTooltip();
+        draw();
+        const link = document.createElement("a");
+        link.download = `${state.view === "btc" ? "BTC-USD_" : ""}${state.selected || "BTC-options"}-${state.period}-kline.png`;
+        link.href = ui.chart.toDataURL("image/png");
+        link.click();
+      }
+    });
+    const chartPointers = new Map();
+    let pinch = null;
+    let pointerMoved = false;
+    let pointerOrigin = null;
+    function beginPinch() {
+      const [a, b] = [...chartPointers.values()];
+      if (!a || !b) return;
+      const rect = ui.chart.getBoundingClientRect();
+      const ratio = Math.max(0, Math.min(1, ((a.x + b.x) / 2 - rect.left - 12) / Math.max(1, rect.width - 84)));
+      pinch = { distance: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), visible: state.visible, anchor: state.start + state.visible * ratio };
+      pointerMoved = true;
+      hideTooltip();
+    }
+    ui.chart.addEventListener("pointermove", (event) => {
+      if (chartPointers.has(event.pointerId)) chartPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (chartPointers.size >= 2 && pinch && state.rows.length) {
+        const [a, b] = [...chartPointers.values()];
+        const distance = Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
+        const rect = ui.chart.getBoundingClientRect();
+        const ratio = Math.max(0, Math.min(1, ((a.x + b.x) / 2 - rect.left - 12) / Math.max(1, rect.width - 84)));
+        state.visible = Math.min(state.rows.length, Math.max(Math.min(8, state.rows.length), Math.round(pinch.visible * pinch.distance / distance)));
+        state.start = Math.max(0, Math.min(state.rows.length - state.visible, Math.round(pinch.anchor - state.visible * ratio)));
+        draw();
+      } else if (state.dragging && state.rows.length) {
+        if (pointerOrigin && Math.hypot(event.clientX - pointerOrigin.x, event.clientY - pointerOrigin.y) > 5) pointerMoved = true;
+        if (!pointerMoved) return;
+        const step = (ui.chart.clientWidth - 84) / state.visible;
+        const shift = Math.round((state.dragX - event.clientX) / Math.max(step, 1));
+        if (shift) {
+          state.start = Math.max(0, Math.min(state.rows.length - state.visible, state.start + shift));
+          state.dragX = event.clientX;
+          draw();
+        }
+      } else if (event.pointerType !== "touch") {
+        showTooltip(event);
+      }
+    });
+    ui.chart.addEventListener("pointerleave", () => {
+      hideTooltip();
+      draw();
+    });
+    ui.chart.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      chartPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (chartPointers.size === 1) {
+        pointerOrigin = { x: event.clientX, y: event.clientY };
+        pointerMoved = false;
+      }
+      state.dragging = true;
+      state.dragX = event.clientX;
+      ui.chart.setPointerCapture(event.pointerId);
+      hideTooltip();
+      ui.chart.style.cursor = "grabbing";
+      if (chartPointers.size >= 2) beginPinch();
+    });
+    function endDrag(event) {
+      const tap = event.type === "pointerup" && chartPointers.has(event.pointerId) && chartPointers.size === 1 && !pointerMoved;
+      chartPointers.delete(event.pointerId);
+      if (chartPointers.size < 2) pinch = null;
+      if (chartPointers.size === 1) {
+        const remaining = [...chartPointers.values()][0];
+        state.dragX = remaining.x;
+        pointerOrigin = remaining;
+      }
+      state.dragging = chartPointers.size > 0;
+      ui.chart.style.cursor = state.dragging ? "grabbing" : "crosshair";
+      if (tap) showTooltip(event);
+    }
+    ui.chart.addEventListener("pointerup", endDrag);
+    ui.chart.addEventListener("pointercancel", endDrag);
+    ui.chart.addEventListener("lostpointercapture", endDrag);
+    ui.chart.addEventListener("dblclick", latest);
+    ui.chart.addEventListener("wheel", (event) => {
+      event.preventDefault();
+      if (!state.rows.length) return;
+      const ratio = Math.max(0, Math.min(1, (event.offsetX - 12) / Math.max(1, ui.chart.clientWidth - 84)));
+      zoom(event.deltaY > 0 ? 10 : -10, ratio);
+    }, { passive: false });
+    window.addEventListener("resize", resizeAndDraw);
+
+    function showError(error) {
+      ui.status.className = "status";
+      ui.status.textContent = error.name === "AbortError" ? "讀取逾時，請按重讀重試" : `讀取失敗：${error.message}`;
+      if (!state.rows.length) {
+        $("chartMessage").hidden = false;
+        $("chartMessage").textContent = "資料尚未載入，請按「重讀」重試";
+      }
+    }
+
+    for (const button of document.querySelectorAll("[data-indicator]")) {
+      button.classList.toggle("active", state.indicators[button.dataset.indicator]);
+      button.setAttribute("aria-pressed", String(state.indicators[button.dataset.indicator]));
+    }
+    updateAutoButton();
+    updateMobileHelp();
+    new ResizeObserver(resizeAndDraw).observe($("chartStage"));
+    loadMeta({ preserveFile: !!state.file });
+  </script>
+</body>
+</html>
