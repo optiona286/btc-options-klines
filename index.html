@@ -493,6 +493,31 @@
     .install-dialog p { line-height: 1.7; font-size: 14px; }
     .install-dialog .btn { min-height: 44px; }
     @media (display-mode: standalone) { #installApp { display: none !important; } }
+    .mobile-filter-heading { display: none; }
+    @media (max-width: 760px), (max-width: 980px) and (pointer: coarse) {
+      body { padding-bottom: 0; }
+      .mobile-nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; padding: 2px 8px calc(2px + env(safe-area-inset-bottom)); border-bottom: 0; border-top: 1px solid #202b3b; background: #0d131c; }
+      .mobile-nav button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 44px; padding: 3px 6px; border: 0; border-radius: 0; background: transparent; color: var(--muted); font-size: 11px; line-height: 1.1; }
+      .mobile-nav button[aria-pressed="true"] { color: var(--cyan); background: transparent; border: 0; }
+      .mobile-nav button:focus-visible { outline: 1px solid var(--cyan); outline-offset: -2px; border-radius: 5px; }
+      .mobile-nav svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+      .layout[data-mobile-view="chain"] aside { grid-template-rows: auto minmax(0, 1fr); height: 100%; min-height: 0; }
+      .layout[data-mobile-view="chain"] aside > .controls,
+      .layout[data-mobile-view="chain"] aside > .filters,
+      .layout[data-mobile-view="chain"] aside > .chain-toolbar { display: none; }
+      .layout[data-mobile-view="chain"] .chain-headline { padding: 8px 10px; }
+      .layout[data-mobile-view="chain"] .chain-wrap { min-height: 0; }
+      .layout[data-mobile-view="filter"] aside { display: block; height: auto; min-height: 100%; border: 0; }
+      .layout[data-mobile-view="filter"] main,
+      .layout[data-mobile-view="filter"] .chain-headline,
+      .layout[data-mobile-view="filter"] .chain-wrap { display: none; }
+      .layout[data-mobile-view="filter"] .mobile-filter-heading { display: block; margin: 0; padding: 14px 12px 8px; font-size: 16px; font-weight: 600; }
+      .layout[data-mobile-view="filter"] .controls,
+      .layout[data-mobile-view="filter"] .filters,
+      .layout[data-mobile-view="filter"] .chain-toolbar { padding: 10px 12px; gap: 10px; border: 0; }
+      .layout[data-mobile-view="filter"] .field label { margin-bottom: 5px; font-size: 11px; }
+      .layout[data-mobile-view="filter"] .controls { grid-template-columns: minmax(0, 1fr) 90px; }
+    }
 </style>
 </head>
 <body>
@@ -500,7 +525,7 @@
     <div class="brand">
       <div class="mark">K</div>
       <div>
-        <h1>BTC Options K 線系統 <span class="version">2.3</span></h1>
+        <h1>BTC Options K 線系統 <span class="version">2.4</span></h1>
         <div class="subtitle">期權鏈・歷史行情工作台</div>
       </div>
     </div>
@@ -519,14 +544,9 @@
     <p>安裝後可從桌面圖示開啟。新行情與尚未看過的資料仍需網路連線。</p>
     <form method="dialog"><button class="btn">關閉</button></form>
   </dialog>
-  <nav class="mobile-nav" aria-label="手機看盤導覽">
-    <button id="mobileChain" aria-pressed="true">期權鏈</button>
-    <button id="mobileChart" aria-pressed="false">K 線</button>
-    <select id="mobilePeriod" aria-label="手機 K 線週期"></select>
-    <button id="mobileRefresh" aria-label="重新載入行情">重讀</button>
-  </nav>
   <div class="layout" data-mobile-view="chain">
     <aside>
+      <h2 class="mobile-filter-heading">篩選</h2>
       <div class="controls">
         <div class="field">
           <label for="fileSelect">選擇到期日期</label>
@@ -618,6 +638,12 @@
     </main>
   </div>
 
+  <nav class="mobile-nav" aria-label="手機看盤導覽">
+    <button id="mobileChain" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M4 12h16M4 19h16M12 5v14"/></svg><span>期權鏈</span></button>
+    <button id="mobileChart" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3v18M18 3v18M4 7h4v7H4zM16 10h4v7h-4z"/></svg><span>K 線</span></button>
+    <button id="mobileFilter" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16M9 4v4M15 10v4M8 16v4"/></svg><span>篩選</span></button>
+  </nav>
+
   <script src="./static-api.js"></script>
   <script>
     const state = {
@@ -681,6 +707,7 @@
       document.querySelector(".layout").dataset.mobileView = view;
       $("mobileChain").setAttribute("aria-pressed", String(view === "chain"));
       $("mobileChart").setAttribute("aria-pressed", String(view === "chart"));
+      $("mobileFilter").setAttribute("aria-pressed", String(view === "filter"));
       hideTooltip();
       requestAnimationFrame(resizeAndDraw);
     }
@@ -699,11 +726,7 @@
     $("touchPan").addEventListener("click", () => setTouchMode("pan"));
     $("mobileChain").addEventListener("click", () => setMobileView("chain"));
     $("mobileChart").addEventListener("click", () => setMobileView("chart"));
-    $("mobilePeriod").addEventListener("change", () => {
-      ui.period.value = $("mobilePeriod").value;
-      ui.period.dispatchEvent(new Event("change"));
-    });
-    $("mobileRefresh").addEventListener("click", () => loadMeta({ preserveFile: true, preserveView: true }));
+    $("mobileFilter").addEventListener("click", () => setMobileView("filter"));
     const fmt = (n, digits = state.view === "btc" ? 3 : 0) => Number(n || 0).toLocaleString("zh-TW", { maximumFractionDigits: digits });
     const compact = (n) => Intl.NumberFormat("zh-TW", { notation: "compact", maximumFractionDigits: 2 }).format(Number(n || 0));
     const pct = (n) => `${n >= 0 ? "+" : ""}${Number(n || 0).toFixed(1)}%`;
@@ -775,7 +798,6 @@
       ui.period.innerHTML = state.periods.map((period) =>
         `<option value="${period}" ${period === state.period ? "selected" : ""}>${period.toUpperCase()}</option>`
       ).join("");
-      $("mobilePeriod").innerHTML = ui.period.innerHTML;
 
       ui.status.className = "status ok";
       ui.status.textContent = `${data.rowCount.toLocaleString()} 筆 ｜ ${data.symbolCount} 合約 ｜ ${data.file.date} ${data.file.interval}`;
@@ -1373,7 +1395,6 @@
     });
     ui.period.addEventListener("change", async () => {
       state.period = ui.period.value;
-      $("mobilePeriod").value = state.period;
       if (state.selected) await selectSymbol(state.selected, { view: state.view });
     });
     ui.expiry.addEventListener("change", () => {
