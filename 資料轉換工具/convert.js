@@ -175,6 +175,17 @@ process.on('exit', () => { try { fs.unlinkSync(lock); } catch {} });
 process.on('SIGINT', () => process.exit(0));
 process.on('SIGTERM', () => process.exit(0));
 const state = fs.existsSync(statePath) ? JSON.parse(fs.readFileSync(statePath, 'utf8')) : {};
+// Existing bundled data is the baseline: never unpack historical archives
+// merely because this computer has no local processed.json yet.
+const baseline = JSON.parse(fs.readFileSync(path.join(dataDir, 'manifest.json'), 'utf8'));
+const coveredDays = new Set();
+for (const entry of baseline.files) {
+  const expiryMs = Date.parse(entry.date + 'T00:00:00Z');
+  for (const offset of [-2, -1, 0]) {
+    const date = iso(expiryMs + offset * dayMs);
+    if (!(entry.missingDates || []).includes(date)) coveredDays.add(date);
+  }
+}
 const observations = new Map(), completed = new Map();
 function scan() {
   let count = 0, failed = false;
@@ -185,7 +196,16 @@ function scan() {
     dates.add(date);
   }
   for (const file of files) {
+    const date = path.basename(file).slice(0, 10);
     const stat = fs.statSync(file), signature = stat.size + ':' + stat.mtimeMs;
+    const previous = state[date];
+    if (!force) {
+      // No readFile, hashing or decompression for an unchanged historical ZIP.
+      if (previous?.sha256 && previous.size === stat.size && previous.mtimeMs === stat.mtimeMs) continue;
+      // Baseline archives without a local fingerprint are already published.
+      // Use --force to deliberately replace one of these historical days.
+      if (!previous && coveredDays.has(date)) continue;
+    }
     if (watch) {
       if (observations.get(file) !== signature) { observations.set(file, signature); continue; }
       if (completed.get(file) === signature) continue;
@@ -197,6 +217,7 @@ function scan() {
   if (!watch) { console.log('完成，更新 ' + count + ' 個 ZIP；未變更的 ZIP 自動略過。'); if (failed) process.exitCode = 1; }
 }
 console.log('輸入資料夾：' + input);
+console.log('既有精簡資料已涵蓋 ' + coveredDays.size + ' 個原始日期；只轉換新增、缺日補檔或已記錄後修改的 ZIP。');
 if (watch) {
   console.log('每 10 秒檢查新資料，檔案穩定後轉換。按 Ctrl+C 停止；不會自動上傳 Git。');
   const safeScan = () => { try { scan(); } catch (error) { console.error(error.message); } };
