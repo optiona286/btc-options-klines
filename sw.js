@@ -1,5 +1,5 @@
 'use strict';
-const VERSION = 'btc-options-pwa-v1';
+const VERSION = 'btc-options-pwa-v2-compare';
 const SHELL = VERSION + '-shell';
 const DATA = VERSION + '-data';
 const BASE = new URL('./', self.location.href);

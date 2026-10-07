@@ -518,7 +518,20 @@
       .layout[data-mobile-view="filter"] .field label { margin-bottom: 5px; font-size: 11px; }
       .layout[data-mobile-view="filter"] .controls { grid-template-columns: minmax(0, 1fr) 90px; }
     }
-</style>
+    .comparison-pane { display: none; flex: 1; min-height: 0; border-bottom: 1px solid var(--line); flex-direction: column; }
+    .comparison-on .comparison-pane { display: flex; }
+    .comparison-heading { padding: 6px 12px; color: var(--cyan); font-size: 12px; border-bottom: 1px solid var(--line); }
+    .comparison-heading span { color: var(--muted); margin-left: 10px; }
+    .comparison-stage { flex: 1; min-height: 0; position: relative; overflow: hidden; }
+    .comparison-info { padding: 5px 12px; font-size: 12px; font-variant-numeric: tabular-nums; line-height: 1.7; min-height: 30px; }
+    .comparison-info span { display: inline-block; margin-right: 14px; }
+    .option-heading { display: none; }
+    .comparison-on .option-heading { display: block; }
+    .comparison-on { min-height: 580px; }
+    .layout main.comparison-layout { grid-template-rows: auto minmax(580px, 1fr); }
+    .comparison-on .cross-info { margin: 0; border-radius: 0; flex-shrink: 0; }
+    @media(max-width: 980px) { .comparison-on { min-height: 640px; } }
+  </style>
 </head>
 <body>
   <header class="topbar">
@@ -614,6 +627,7 @@
       </section>
       <section class="chart-wrap" id="chartWrap">
         <div class="chart-tools">
+          <button id="compareToggle" class="toggle" aria-pressed="false">上下對比</button>
           <button class="toggle active" data-indicator="ma7">MA7</button>
           <button class="toggle active" data-indicator="ma20">MA20</button>
           <button class="toggle" data-indicator="bb">布林</button>
@@ -628,6 +642,15 @@
           <button class="toggle" data-action="png">存 PNG</button>
           <button class="toggle" data-action="csv">匯出 CSV</button>
         </div>
+        <div class="comparison-pane">
+          <div class="comparison-heading">BTC / USD · 現貨<span>Coinbase · 與期權同步時間</span></div>
+          <div id="btcCrossInfo" class="comparison-info">--</div>
+          <div id="btcCompareStage" class="comparison-stage">
+            <canvas id="btcCompareChart" aria-label="BTC 現貨 K 線，與下方期權同步縮放與平移"></canvas>
+            <div id="btcCompareMessage" class="chart-message">正在載入 BTC 行情…</div>
+          </div>
+        </div>
+        <div class="comparison-heading option-heading" id="optionCompareHeading">期權 K 線</div>
         <div id="chartStage" class="chart-stage">
           <canvas id="chart" aria-label="期權 K 線圖，拖曳平移，滾輪縮放，雙擊回到最新"></canvas>
           <div id="chartMessage" class="chart-message">正在載入行情…</div>
@@ -663,7 +686,7 @@
       expiry: "", favorites: [], mode: "strike", autoRefresh: false,
       busy: false, metaBusy: false, requestId: 0, controller: null,
       studies: null, hoverY: null,
-      view: "option",
+      view: "option", compare: false, btcRows: [], btcByTime: new Map(),
     };
 
     const SETTINGS_KEY = "btc-options-portable-1h-v1";
@@ -674,6 +697,7 @@
       }
       if (["strike", "volume", "favorites"].includes(saved.mode)) state.mode = saved.mode;
       if (["option", "btc"].includes(saved.view)) state.view = saved.view;
+      state.compare = saved.compare === true;
       state.favorites = Array.isArray(saved.favorites) ? saved.favorites.filter((s) => typeof s === "string") : [];
       state.autoRefresh = saved.autoRefresh === true;
       for (const key of Object.keys(state.indicators)) {
@@ -682,8 +706,8 @@
     } catch { /* Storage can be unavailable in a private browser session. */ }
 
     function saveSettings() {
-      const { file, period, selected, expiry, mode, favorites, autoRefresh, indicators, view } = state;
-      try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ file, period, selected, expiry, mode, favorites, autoRefresh, indicators, view })); } catch {}
+      const { file, period, selected, expiry, mode, favorites, autoRefresh, indicators, view, compare } = state;
+      try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ file, period, selected, expiry, mode, favorites, autoRefresh, indicators, view, compare })); } catch {}
     }
 
     const $ = (id) => document.getElementById(id);
@@ -752,6 +776,11 @@
 
     function clearChart(message = "正在載入行情…") {
       state.rows = [];
+      state.btcRows = [];
+      state.btcByTime.clear();
+      $("btcCompareMessage").hidden = false;
+      $("btcCompareMessage").textContent = "正在載入 BTC 行情…";
+      $("btcCrossInfo").textContent = "--";
       state.studies = null;
       $("finalSessionInfo").hidden = true;
       $("finalSixHoursInfo").hidden = true;
@@ -866,6 +895,7 @@
 
     async function selectSymbol(symbol, { preserveView = false, view = "option" } = {}) {
       if (state.metaBusy) return;
+      if (state.compare) view = "option";
       preserveView = preserveView && state.rows.length > 0 && state.view === view && state.selected === symbol;
       const request = beginRequest();
       const oldStart = state.start;
@@ -895,6 +925,7 @@
         ui.status.className = "status ok";
         ui.status.textContent = `${chartSymbol} ｜ ${data.period.toUpperCase()} ｜ ${data.count} 根 K 棒`;
         saveSettings();
+        if (state.compare) loadCompareBtc(symbol, request);
       } catch (error) {
         if (request.id === state.requestId) {
           clearChart("載入失敗，請按「重讀」重試");
@@ -913,6 +944,7 @@
       const last = rows.at(-1);
       const change = first.open ? ((last.close / first.open) - 1) * 100 : 0;
       const isBtc = data.market === "btc";
+      $("optionCompareHeading").textContent = "期權 · " + state.selected;
       $("symbolTitle").textContent = isBtc ? "BTC / USD" : state.selected;
       $("chartKind").textContent = isBtc ? "BTC 現貨 · 技術分析" : "期權 K 線";
       $("volumeLabel").textContent = isBtc ? "成交量（BTC）" : "成交量";
@@ -1105,10 +1137,116 @@
       ui.chart.width = Math.max(1, Math.round(rect.width * dpr));
       ui.chart.height = Math.max(1, Math.round(rect.height * dpr));
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const btcCanvas = $("btcCompareChart"), btcRect = $("btcCompareStage").getBoundingClientRect();
+      btcCanvas.width = Math.max(1, Math.round(btcRect.width * dpr));
+      btcCanvas.height = Math.max(1, Math.round(btcRect.height * dpr));
+      btcCanvas.getContext("2d").setTransform(dpr, 0, 0, dpr, 0, 0);
       draw();
     }
 
+    const compareCache = new Map();
+    async function loadCompareBtc(symbol, request) {
+      const key = [state.file, state.period, symbol].join("|");
+      $("btcCompareMessage").hidden = false;
+      $("btcCompareMessage").textContent = "正在載入 BTC 行情…";
+      state.btcRows = []; state.btcByTime.clear(); drawCompareBtc();
+      try {
+        let data = compareCache.get(key);
+        if (!data) {
+          data = await getJson(`/api/btc-klines?file=${encodeURIComponent(state.file)}&symbol=${encodeURIComponent(symbol)}&period=${encodeURIComponent(state.period)}`, request.controller);
+          if (request.id !== state.requestId || !state.compare) return;
+          // Cache completed historical windows, but refresh today's partial window.
+          const last = data.items?.at(-1);
+          if (last && Date.parse(last.timeUtc.replace(" ", "T") + "Z") + 4 * 3600000 < Date.now()) {
+            compareCache.set(key, data);
+            if (compareCache.size > 6) compareCache.delete(compareCache.keys().next().value);
+          }
+        }
+        if (request.id !== state.requestId || !state.compare) return;
+        state.btcRows = data.items || [];
+        state.btcByTime = new Map(state.btcRows.map(row => [row.timeUtc, row]));
+        $("btcCompareMessage").hidden = state.btcRows.length > 0;
+        $("btcCompareMessage").textContent = "此時段沒有 BTC 行情";
+        draw();
+      } catch (error) {
+        if (request.id !== state.requestId || !state.compare) return;
+        $("btcCompareMessage").hidden = false;
+        $("btcCompareMessage").textContent = "BTC 行情載入失敗，按重讀重試；期權圖仍可使用";
+      }
+    }
+    function drawCompareBtc() {
+      if (!state.compare) return;
+      const canvas = $("btcCompareChart"), context = canvas.getContext("2d");
+      const w = canvas.clientWidth, h = canvas.clientHeight;
+      context.clearRect(0, 0, w, h); context.fillStyle = "#111823"; context.fillRect(0, 0, w, h);
+      if (!state.rows.length || !state.btcRows.length || w < 120 || h < 80) return;
+      const slots = state.rows.slice(state.start, state.start + state.visible);
+      const rows = slots.map(row => state.btcByTime.get(row.timeUtc));
+      const valid = rows.filter(Boolean);
+      if (!valid.length) { $("btcCrossInfo").textContent = "目前顯示區間沒有 BTC 資料"; return; }
+      const left = 12, right = 72, top = 18, bottom = h - 27, width = w - left - right;
+      let min = Math.min(...valid.map(row => row.low)), max = Math.max(...valid.map(row => row.high));
+      const padding = Math.max((max - min) * .08, max * .001, 1); min -= padding; max += padding;
+      const x = i => left + (i + .5) * width / slots.length;
+      const y = value => top + (max - value) / (max - min) * (bottom - top);
+      context.font = "11px Segoe UI"; context.lineWidth = 1; context.fillStyle = "#718096";
+      for (let i = 0; i <= 4; i++) {
+        const gy = top + (bottom - top) * i / 4;
+        context.strokeStyle = "#202b3b"; context.beginPath(); context.moveTo(left, gy); context.lineTo(w - right, gy); context.stroke();
+        context.textAlign = "left"; context.fillText(fmt(max - (max - min) * i / 4), w - right + 8, gy + 4);
+      }
+      const every = Math.max(1, Math.ceil(slots.length / Math.max(1, Math.floor(width / 100))));
+      slots.forEach((row, i) => {
+        if (i % every) return;
+        context.strokeStyle = "#202b3b"; context.beginPath(); context.moveTo(x(i), top); context.lineTo(x(i), bottom); context.stroke();
+        context.fillStyle = "#718096"; context.textAlign = "center"; context.fillText(row.time.slice(5, 16), x(i), h - 8);
+      });
+      const candleWidth = Math.max(.5, width / slots.length * .8);
+      rows.forEach((row, i) => {
+        if (!row) return; // Missing source intervals keep their empty time slot.
+        context.fillStyle = context.strokeStyle = row.close >= row.open ? "#ea3943" : "#16c784";
+        context.beginPath(); context.moveTo(x(i), y(row.high)); context.lineTo(x(i), y(row.low)); context.stroke();
+        context.fillRect(x(i) - candleWidth / 2, y(Math.max(row.open, row.close)), candleWidth, Math.max(1, Math.abs(y(row.open) - y(row.close))));
+      });
+      for (const [indicator, length, color] of [["ma7", 7, "#f5b942"], ["ma20", 20, "#42c8f5"]]) {
+        if (!state.indicators[indicator]) continue;
+        const averages = movingAverage(state.btcRows, length);
+        const byTime = new Map(state.btcRows.map((row, i) => [row.timeUtc, averages[i]]));
+        context.strokeStyle = color; context.beginPath(); let started = false;
+        slots.forEach((row, i) => { const value = byTime.get(row.timeUtc); if (!Number.isFinite(value)) { started = false; return; } if (started) context.lineTo(x(i), y(value)); else { context.moveTo(x(i), y(value)); started = true; } });
+        context.stroke();
+      }
+      const hover = state.hover >= state.start && state.hover < state.start + slots.length ? state.hover - state.start : -1;
+      const row = hover >= 0 ? rows[hover] : valid.at(-1);
+      if (hover >= 0) {
+        context.strokeStyle = "#8795aa"; context.setLineDash([4,4]); context.beginPath(); context.moveTo(x(hover), top); context.lineTo(x(hover), bottom);
+        if (row) { context.moveTo(left, y(row.close)); context.lineTo(w - right, y(row.close)); }
+        context.stroke(); context.setLineDash([]);
+      }
+      if (!row) { $("btcCrossInfo").textContent = "此時間 BTC 行情缺少資料"; return; }
+      const points = row.close - row.open, percent = row.open ? points / row.open * 100 : null;
+      $("btcCrossInfo").innerHTML = `<span>${esc(row.time)}</span>` + [["開",row.open],["高",row.high],["低",row.low],["收",row.close],["高低差",row.high-row.low]].map(([label,value]) => `<span>${label} <b>${fmt(value)}</b></span>`).join("") + `<span class="chg ${points >= 0 ? "up" : "down"}">漲跌 ${points >= 0 ? "+" : ""}${fmt(points)}（${percent == null ? "--" : percent.toFixed(2) + "%"}）</span>`;
+    }
+    function updateCompareMode() {
+      ui.wrap.classList.toggle("comparison-on", state.compare);
+      const main = ui.wrap.parentElement;
+      main.classList.toggle("comparison-layout", state.compare);
+      if (state.compare) ui.wrap.insertBefore($("crossInfo"), $("chartStage"));
+      else main.insertBefore($("crossInfo"), ui.wrap);
+      $("compareToggle").classList.toggle("active", state.compare);
+      $("compareToggle").setAttribute("aria-pressed", String(state.compare));
+      $("compareToggle").textContent = state.compare ? "上下對比：開" : "上下對比";
+    }
+    $("compareToggle").addEventListener("click", async () => {
+      state.compare = !state.compare; updateCompareMode(); saveSettings(); resizeAndDraw();
+      if (state.selected) await selectSymbol(state.selected, { view: state.compare ? "option" : state.view });
+    });
+    updateCompareMode();
     function draw() {
+      drawOption();
+      drawCompareBtc();
+    }
+    function drawOption() {
       const w = ui.chart.clientWidth;
       const h = ui.chart.clientHeight;
       ctx.clearRect(0, 0, w, h);
@@ -1328,7 +1466,8 @@
     }
     function showTooltip(event) {
       if (!state.rows.length) return;
-      const rect = ui.chart.getBoundingClientRect();
+      const source = event.currentTarget instanceof HTMLCanvasElement ? event.currentTarget : ui.chart;
+      const rect = source.getBoundingClientRect();
       const left = 12;
       const right = 72;
       const localX = event.clientX - rect.left;
@@ -1340,7 +1479,7 @@
         return;
       }
       state.hover = state.start + index;
-      state.hoverY = event.clientY - rect.top;
+      state.hoverY = source === ui.chart ? event.clientY - rect.top : null;
       const row = state.rows[state.hover];
       if (!row) return;
       renderCrossInfo(row);
@@ -1476,29 +1615,39 @@
         draw();
         const link = document.createElement("a");
         link.download = `${state.view === "btc" ? "BTC-USD_" : ""}${state.selected || "BTC-options"}-${state.period}-kline.png`;
-        link.href = ui.chart.toDataURL("image/png");
+        if (state.compare) {
+          const image = document.createElement("canvas"), btc = $("btcCompareChart");
+          image.width = ui.chart.width; image.height = btc.height + ui.chart.height + 64;
+          const imageCtx = image.getContext("2d"); imageCtx.fillStyle = "#111823"; imageCtx.fillRect(0,0,image.width,image.height);
+          imageCtx.fillStyle = "#42c8f5"; imageCtx.font = "20px Segoe UI";
+          imageCtx.fillText("BTC / USD",12,24); imageCtx.drawImage(btc,0,32);
+          imageCtx.fillText(state.selected,12,btc.height+56); imageCtx.drawImage(ui.chart,0,btc.height+64);
+          link.href = image.toDataURL("image/png");
+        } else link.href = ui.chart.toDataURL("image/png");
         link.click();
       }
     });
     const chartPointers = new Map();
+    let activeGestureCanvas = ui.chart;
     let pinch = null;
     let pointerMoved = false;
     let pointerOrigin = null;
     function beginPinch() {
       const [a, b] = [...chartPointers.values()];
       if (!a || !b) return;
-      const rect = ui.chart.getBoundingClientRect();
+      const rect = activeGestureCanvas.getBoundingClientRect();
       const ratio = Math.max(0, Math.min(1, ((a.x + b.x) / 2 - rect.left - 12) / Math.max(1, rect.width - 84)));
       pinch = { distance: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), visible: state.visible, anchor: state.start + state.visible * ratio };
       pointerMoved = true;
       hideTooltip();
     }
-    ui.chart.addEventListener("pointermove", (event) => {
+    for (const gestureCanvas of [ui.chart, $("btcCompareChart")]) {
+    gestureCanvas.addEventListener("pointermove", (event) => {
       if (chartPointers.has(event.pointerId)) chartPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
       if (chartPointers.size >= 2 && pinch && state.rows.length) {
         const [a, b] = [...chartPointers.values()];
         const distance = Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
-        const rect = ui.chart.getBoundingClientRect();
+        const rect = activeGestureCanvas.getBoundingClientRect();
         const ratio = Math.max(0, Math.min(1, ((a.x + b.x) / 2 - rect.left - 12) / Math.max(1, rect.width - 84)));
         state.visible = Math.min(state.rows.length, Math.max(Math.min(8, state.rows.length), Math.round(pinch.visible * pinch.distance / distance)));
         state.start = Math.max(0, Math.min(state.rows.length - state.visible, Math.round(pinch.anchor - state.visible * ratio)));
@@ -1509,7 +1658,7 @@
       } else if (state.dragging && state.rows.length) {
         if (pointerOrigin && Math.hypot(event.clientX - pointerOrigin.x, event.clientY - pointerOrigin.y) > 5) pointerMoved = true;
         if (!pointerMoved) return;
-        const step = (ui.chart.clientWidth - 84) / state.visible;
+        const step = (gestureCanvas.clientWidth - 84) / state.visible;
         const shift = Math.round((state.dragX - event.clientX) / Math.max(step, 1));
         if (shift) {
           state.start = Math.max(0, Math.min(state.rows.length - state.visible, state.start + shift));
@@ -1520,13 +1669,14 @@
         showTooltip(event);
       }
     });
-    ui.chart.addEventListener("pointerleave", (event) => {
+    gestureCanvas.addEventListener("pointerleave", (event) => {
       if (event.pointerType !== "mouse" || mobileLayout.matches) return;
       hideTooltip();
       draw();
     });
-    ui.chart.addEventListener("pointerdown", (event) => {
+    gestureCanvas.addEventListener("pointerdown", (event) => {
       if (event.button !== 0) return;
+      activeGestureCanvas = gestureCanvas;
       chartPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
       if (chartPointers.size === 1) {
         pointerOrigin = { x: event.clientX, y: event.clientY };
@@ -1534,10 +1684,10 @@
       }
       state.dragging = true;
       state.dragX = event.clientX;
-      ui.chart.setPointerCapture(event.pointerId);
+      gestureCanvas.setPointerCapture(event.pointerId);
       if (event.pointerType !== "mouse" && touchMode === "crosshair") showTooltip(event);
       else hideTooltip();
-      ui.chart.style.cursor = "grabbing";
+      gestureCanvas.style.cursor = "grabbing";
       if (chartPointers.size >= 2) beginPinch();
     });
     function endDrag(event) {
@@ -1550,19 +1700,20 @@
         pointerOrigin = remaining;
       }
       state.dragging = chartPointers.size > 0;
-      ui.chart.style.cursor = state.dragging ? "grabbing" : "crosshair";
+      gestureCanvas.style.cursor = state.dragging ? "grabbing" : "crosshair";
       if (tap) showTooltip(event);
     }
-    ui.chart.addEventListener("pointerup", endDrag);
-    ui.chart.addEventListener("pointercancel", endDrag);
-    ui.chart.addEventListener("lostpointercapture", endDrag);
-    ui.chart.addEventListener("dblclick", (event) => { if (event.pointerType === "mouse" || !mobileLayout.matches) latest(); });
-    ui.chart.addEventListener("wheel", (event) => {
+    gestureCanvas.addEventListener("pointerup", endDrag);
+    gestureCanvas.addEventListener("pointercancel", endDrag);
+    gestureCanvas.addEventListener("lostpointercapture", endDrag);
+    gestureCanvas.addEventListener("dblclick", (event) => { if (event.pointerType === "mouse" || !mobileLayout.matches) latest(); });
+    gestureCanvas.addEventListener("wheel", (event) => {
       event.preventDefault();
       if (!state.rows.length) return;
-      const ratio = Math.max(0, Math.min(1, (event.offsetX - 12) / Math.max(1, ui.chart.clientWidth - 84)));
+      const ratio = Math.max(0, Math.min(1, (event.offsetX - 12) / Math.max(1, gestureCanvas.clientWidth - 84)));
       zoom(event.deltaY > 0 ? 10 : -10, ratio);
     }, { passive: false });
+    }
     window.addEventListener("resize", resizeAndDraw);
 
     function showError(error) {
