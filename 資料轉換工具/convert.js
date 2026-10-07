@@ -11,7 +11,8 @@ const watch = args.includes('--watch');
 const force = args.includes('--force');
 const inputAt = args.indexOf('--input');
 if (inputAt >= 0 && !args[inputAt + 1]) throw Error('--input 必須指定資料夾');
-const input = inputAt >= 0 ? path.resolve(args[inputAt + 1]) : path.join(__dirname, '新資料');
+const config = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
+const input = inputAt >= 0 ? path.resolve(args[inputAt + 1]) : path.resolve(__dirname, config.sourceDirectory);
 const stateDir = path.join(__dirname, '.state');
 const statePath = path.join(stateDir, 'processed.json');
 const dayMs = 86400000;
@@ -159,7 +160,7 @@ function convert(file, state) {
   console.log(sourceDay + ' 已更新：' + updates.map(item => path.basename(item.output, '.json.gz')).join('、'));
   return true;
 }
-fs.mkdirSync(input, { recursive: true });
+if (!fs.existsSync(input) || !fs.statSync(input).isDirectory()) throw Error('原始資料夾不存在，請修改 config.json 的 sourceDirectory：' + input);
 fs.mkdirSync(stateDir, { recursive: true });
 const lock = path.join(stateDir, 'convert.lock');
 if (fs.existsSync(lock)) {
