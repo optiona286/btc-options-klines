@@ -11,3 +11,7 @@ logs/
 cache/
 .DS_Store
 Thumbs.db
+資料轉換工具/新資料/*
+!資料轉換工具/新資料/.gitkeep
+資料轉換工具/.state/
+*.tmp-*

@@ -1,1 +1,14 @@
-{"name":"btc-options-klines","version":"1.0.0","private":true,"description":"Portable BTC option mark-price charts with compact 1h expiry datasets","scripts":{"start":"node server.js"},"engines":{"node":">=20.3"}}
+{
+  "name": "btc-options-klines",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Portable BTC option mark-price charts with compact 1h expiry datasets",
+  "scripts": {
+    "start": "node server.js",
+    "convert": "node 資料轉換工具/convert.js",
+    "watch-data": "node 資料轉換工具/convert.js --watch"
+  },
+  "engines": {
+    "node": ">=20.3"
+  }
+}

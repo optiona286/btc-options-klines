@@ -31,3 +31,7 @@ manifest記錄每個到期日的來源天數、缺失來源日期、K棒數與�
 將來需新增到期日資料時，另行轉換生成新的精簡資料，再更新Git專案。
 ## GitHub Pages測試版
 GitHub Pages會使用static-api.js，由瀏覽器讀取data精簡資料並聚合K線，不需Node服務。使用支援DecompressionStream、AbortSignal.any的新版Edge／Chrome。BTC/USD由瀏覽器直接取得Coinbase公開行情。Node模式仍保留，登入及任何API金鑰皆不需要。
+
+## 後續新增資料
+
+參考 [資料轉換工具說明](資料轉換工具/README.md)。將 ZIP 放入工具的「新資料」資料夾，使用手動轉換或自動監看，更新 1h 精簡資料後自行提交上傳。原始 ZIP 不會進 Git。
