@@ -3,7 +3,7 @@ Set fso = CreateObject("Scripting.FileSystemObject")
 
 appDir = fso.GetParentFolderName(WScript.ScriptFullName)
 nodeExe = "C:\Program Files\nodejs\node.exe"
-port = "5080"
+port = "5083"
 
 shell.CurrentDirectory = appDir
 

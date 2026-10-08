@@ -15,3 +15,7 @@ Thumbs.db
 !資料轉換工具/新資料/.gitkeep
 資料轉換工具/.state/
 *.tmp-*
+
+data1/*.csv
+
+原始資料/

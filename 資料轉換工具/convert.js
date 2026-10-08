@@ -198,6 +198,7 @@ function scan() {
   for (const file of files) {
     const date = path.basename(file).slice(0, 10);
     const stat = fs.statSync(file), signature = stat.size + ':' + stat.mtimeMs;
+
     const previous = state[date];
     if (!force) {
       // No readFile, hashing or decompression for an unchanged historical ZIP.

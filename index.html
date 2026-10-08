@@ -562,6 +562,8 @@
       <h2 class="mobile-filter-heading">篩選</h2>
       <div class="controls">
         <div class="field">
+          <div id="importStatus" role="status" style="font-size:11px;color:var(--muted);margin-bottom:6px;overflow-wrap:anywhere">自動轉換：連線中…</div>
+          <label for="datasetMode">資料模式</label><select id="datasetMode" style="margin-bottom:8px"><option value="data">原有標記價格（data）</option><option value="data1">幣安成交 K 線（data1）</option></select>
           <label for="fileSelect">選擇到期日期</label>
           <select id="fileSelect"></select>
         </div>
@@ -634,6 +636,8 @@
           <button class="toggle active" data-indicator="highLow">高低價</button>
           <button class="toggle active" data-indicator="finalSession" title="到期前一天 16:00 至到期日 16:00（台灣時間）">最後 24h</button>
           <button class="toggle active" data-indicator="finalSixHours" title="到期日前最後 6 小時（台灣時間）">最後 6h</button>
+          <button class="toggle active" data-indicator="idealRange" title="BTC/USD：最後 24h 第一根開盤價上下 2,000 點，虛線不透明度 30%">理想範圍</button>
+          <button class="toggle active" data-indicator="realityRange" title="BTC/USD：最後 24h 第一根開盤價上下 1,000 點，虛線不透明度 30%">現實範圍</button>
           <button class="toggle active" data-indicator="volume">成交量</button>
           <button class="toggle" data-action="latest">回到最新</button>
           <button class="toggle" data-action="zoomIn" aria-label="放大 K 線">＋</button>
@@ -654,7 +658,7 @@
         <div id="chartStage" class="chart-stage">
           <canvas id="chart" aria-label="期權 K 線圖，拖曳平移，滾輪縮放，雙擊回到最新"></canvas>
           <div id="chartMessage" class="chart-message">正在載入行情…</div>
-          
+
         </div>
         <div class="chart-footer"><div class="touch-modes" role="group" aria-label="觸控操作模式"><button id="touchCrosshair" aria-pressed="true">十字線</button><button id="touchPan" aria-pressed="false">平移</button></div><span id="viewRange">--</span><span id="gestureHelp">拖曳平移 · 滾輪縮放 · 雙擊回到最新</span></div>
       </section>
@@ -682,19 +686,21 @@
       hover: -1,
       dragging: false,
       dragX: 0,
-      indicators: { ma7: true, ma20: true, bb: false, highLow: true, volume: true, finalSession: true, finalSixHours: true },
+      indicators: { ma7: true, ma20: true, bb: false, highLow: true, volume: true, finalSession: true, finalSixHours: true, idealRange: true, realityRange: true },
       expiry: "", favorites: [], mode: "strike", autoRefresh: false,
       busy: false, metaBusy: false, requestId: 0, controller: null,
       studies: null, hoverY: null,
       view: "option", compare: false, btcRows: [], btcByTime: new Map(),
     };
 
+    state.datasetMode = "data";
     const SETTINGS_KEY = "btc-options-portable-1h-v1";
     try {
       const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
       for (const key of ["file", "period", "selected", "expiry"]) {
         if (typeof saved[key] === "string") state[key] = saved[key];
       }
+      if (["data", "data1"].includes(saved.datasetMode)) state.datasetMode = saved.datasetMode;
       if (["strike", "volume", "favorites"].includes(saved.mode)) state.mode = saved.mode;
       if (["option", "btc"].includes(saved.view)) state.view = saved.view;
       state.compare = saved.compare === true;
@@ -707,7 +713,7 @@
 
     function saveSettings() {
       const { file, period, selected, expiry, mode, favorites, autoRefresh, indicators, view, compare } = state;
-      try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ file, period, selected, expiry, mode, favorites, autoRefresh, indicators, view, compare })); } catch {}
+      try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ file, period, selected, expiry, mode, favorites, autoRefresh, indicators, view, compare, datasetMode:state.datasetMode })); } catch {}
     }
 
     const $ = (id) => document.getElementById(id);
@@ -757,6 +763,9 @@
     const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
 
     async function getJson(url, controller) {
+      const requestUrl = new URL(url, location.origin);
+      requestUrl.searchParams.set("mode", state.datasetMode);
+      url = requestUrl.pathname + requestUrl.search;
       if (location.hostname.endsWith("github.io")) return window.btcStaticApi(url, controller);
       const timeout = setTimeout(() => controller.abort(), url.startsWith("/api/btc-klines") ? 50000 : 15000);
       try {
@@ -789,7 +798,7 @@
       $("chartMessage").hidden = false;
       for (const id of ["lastPrice", "change", "highValue", "lowValue", "volumeValue", "tradesValue", "timeValue", "barsValue", "viewRange"]) $(id).textContent = "--";
       $("symbolTitle").textContent = state.view === "btc" ? "BTC / USD" : state.selected || "--";
-      $("chartKind").textContent = state.view === "btc" ? "BTC 現貨 · 技術分析" : "期權 K 線";
+      $("chartKind").textContent = state.view === "btc" ? "BTC 現貨 · 技術分析" : (state.datasetMode === "data1" ? "幣安成交 K 線" : "期權標記價格 K 線");
       $("volumeLabel").textContent = state.view === "btc" ? "成交量（BTC）" : "成交量";
       $("sourceInfo").textContent = "";
       $("symbolMeta").textContent = "";
@@ -801,7 +810,7 @@
       state.metaBusy = true;
       if (!preserveView) clearChart();
       ui.status.className = "status";
-      ui.status.textContent = "正在讀取 1h 精簡資料...";
+      ui.status.textContent = "正在讀取所選資料模式…";
       const requested = preserveFile && state.file ? `?file=${encodeURIComponent(state.file)}` : "";
       try {
       const data = await getJson(`/api/meta${requested}`, request.controller);
@@ -819,7 +828,7 @@
       ui.expiry.innerHTML = `<option value="all">全部到期日</option>` + expiries.map((expiry) => `<option value="${esc(expiry)}">${esc(expiry)}</option>`).join("");
       ui.expiry.value = state.expiry;
       ui.mode.value = state.mode;
-      $("sourceInfo").textContent = `到期日 ${data.file.date} · 前兩天＋當天 ${data.file.firstDate} ～ ${data.file.lastDate} · 檔案更新 ${new Date(data.file.modifiedAt).toLocaleString("zh-TW", { hour12: false, timeZone: "Asia/Taipei" })} · 台北時間${data.file.missingDates?.length ? ` · 缺來源 ${data.file.missingDates.join("、")}` : ""}`;
+      $("sourceInfo").textContent = `${state.datasetMode === "data1" ? "幣安成交" : "標記價格"} · 到期日 ${data.file.date} · 前兩天＋當天 ${data.file.firstDate} ～ ${data.file.lastDate} · 檔案更新 ${new Date(data.file.modifiedAt).toLocaleString("zh-TW", { hour12: false, timeZone: "Asia/Taipei" })} · 台北時間${data.file.missingDates?.length ? ` · 缺來源 ${data.file.missingDates.join("、")}` : ""}`;
 
       ui.file.innerHTML = data.files.map((file) =>
         `<option value="${esc(file.name)}" ${file.name === state.file ? "selected" : ""}>${file.date} 到期 ｜ ${file.sourceDays} 個交易日</option>`
@@ -829,7 +838,7 @@
       ).join("");
 
       ui.status.className = "status ok";
-      ui.status.textContent = `${data.rowCount.toLocaleString()} 筆 ｜ ${data.symbolCount} 合約 ｜ ${data.file.date} ${data.file.interval}`;
+      ui.status.textContent = `${state.datasetMode === "data1" ? "幣安成交" : "標記價格"} ｜ ${data.rowCount.toLocaleString()} 筆 ｜ ${data.symbolCount} 合約 ｜ ${data.file.date} ${data.file.interval}`;
       renderChain();
 
       state.metaBusy = false;
@@ -946,12 +955,12 @@
       const isBtc = data.market === "btc";
       $("optionCompareHeading").textContent = "期權 · " + state.selected;
       $("symbolTitle").textContent = isBtc ? "BTC / USD" : state.selected;
-      $("chartKind").textContent = isBtc ? "BTC 現貨 · 技術分析" : "期權 K 線";
+      $("chartKind").textContent = isBtc ? "BTC 現貨 · 技術分析" : (state.datasetMode === "data1" ? "幣安成交 K 線" : "期權標記價格 K 線");
       $("volumeLabel").textContent = isBtc ? "成交量（BTC）" : "成交量";
       $("symbolMeta").textContent = `到期 ${info.expiryDate} ｜ 履約價 ${fmt(info.strikePrice, 0)} ｜ ${isBtc ? "對應時段 BTC 現貨" : info.side} ｜ ${data.period.toUpperCase()}${data.period !== data.sourceInterval ? `（由 ${data.sourceInterval} 聚合）` : ""}`;
       $("sourceInfo").textContent = isBtc
         ? `${data.provider} · 契約資料 ${data.range.optionStart} ～ ${data.range.optionEnd} · 台北時間${data.missingSourceBars ? ` · 來源缺少 ${data.missingSourceBars} 根 K 棒` : ""}`
-        : `到期日 ${data.file.date} · 前兩天＋當天 ${data.file.firstDate} ～ ${data.file.lastDate} · 檔案更新 ${new Date(data.file.modifiedAt).toLocaleString("zh-TW", { hour12: false, timeZone: "Asia/Taipei" })} · 台北時間${data.file.missingDates?.length ? ` · 缺來源 ${data.file.missingDates.join("、")}` : ""}`;
+        : `${state.datasetMode === "data1" ? "幣安成交" : "標記價格"} · 到期日 ${data.file.date} · 前兩天＋當天 ${data.file.firstDate} ～ ${data.file.lastDate} · 檔案更新 ${new Date(data.file.modifiedAt).toLocaleString("zh-TW", { hour12: false, timeZone: "Asia/Taipei" })} · 台北時間${data.file.missingDates?.length ? ` · 缺來源 ${data.file.missingDates.join("、")}` : ""}`;
       $("lastPrice").textContent = fmt(last.close);
       $("lastPrice").style.color = change >= 0 ? "var(--up)" : "var(--down)";
       $("change").textContent = `${change >= 0 ? "+" : ""}${change.toFixed(2)}%（目前載入區間）`;
@@ -1010,6 +1019,45 @@
 
     function taiwanTimeLabel(time) {
       return new Date(time + 8 * 3600000).toISOString().slice(0, 16).replace("T", " ");
+    }
+
+    function btcRangeBoundaries(allRows) {
+      const session = finalSessionWindow();
+      if (!session) return [];
+      // Use the actual opening candle; a missing opening slot is never replaced by a later bar.
+      const first = allRows.find(row => barTaiwanTime(row) === session.start);
+      if (!first || !Number.isFinite(first.open)) return [];
+      const ranges = [
+        ["idealRange", "理想範圍", 2000, "rgba(245,185,66,.30)", "#f5b942"],
+        ["realityRange", "現實範圍", 1000, "rgba(66,200,245,.30)", "#42c8f5"]
+      ];
+      return ranges.filter(([key]) => state.indicators[key]).flatMap(([, title, distance, color, labelColor]) => [
+        { price:first.open + distance, title:title + " 上限 +" + distance.toLocaleString("zh-TW"), color, labelColor },
+        { price:first.open - distance, title:title + " 下限 −" + distance.toLocaleString("zh-TW"), color, labelColor }
+      ]);
+    }
+
+    function drawBtcRanges(context, boundaries, left, top, width, bottom, y) {
+      context.save();
+      context.beginPath(); context.rect(left, top, width, bottom - top); context.clip();
+      context.lineWidth = 2;
+      context.font = "11px Segoe UI, Microsoft JhengHei";
+      context.textAlign = "left";
+      for (const boundary of boundaries) {
+        const py = y(boundary.price);
+        if (!Number.isFinite(py) || py < top || py > bottom) continue;
+        context.strokeStyle = boundary.color;
+        context.setLineDash([6, 4]);
+        context.beginPath(); context.moveTo(left, py); context.lineTo(left + width, py); context.stroke();
+        context.setLineDash([]);
+        const label = boundary.title + " · " + fmt(boundary.price, 2);
+        const labelY = py < top + 16 ? py + 14 : py - 5;
+        context.fillStyle = "rgba(17,24,35,.85)";
+        context.fillRect(left + 4, labelY - 11, context.measureText(label).width + 8, 15);
+        context.fillStyle = boundary.labelColor;
+        context.fillText(label, left + 8, labelY);
+      }
+      context.restore();
     }
 
     function drawFinalSession(rows, left, top, plotW, chartBottom) {
@@ -1185,7 +1233,9 @@
       const valid = rows.filter(Boolean);
       if (!valid.length) { $("btcCrossInfo").textContent = "目前顯示區間沒有 BTC 資料"; return; }
       const left = 12, right = 72, top = 18, bottom = h - 27, width = w - left - right;
-      let min = Math.min(...valid.map(row => row.low)), max = Math.max(...valid.map(row => row.high));
+      const boundaries = btcRangeBoundaries(state.btcRows);
+      let min = Math.min(...valid.map(row => row.low), ...boundaries.map(line => line.price));
+      let max = Math.max(...valid.map(row => row.high), ...boundaries.map(line => line.price));
       const padding = Math.max((max - min) * .08, max * .001, 1); min -= padding; max += padding;
       const x = i => left + (i + .5) * width / slots.length;
       const y = value => top + (max - value) / (max - min) * (bottom - top);
@@ -1216,6 +1266,7 @@
         slots.forEach((row, i) => { const value = byTime.get(row.timeUtc); if (!Number.isFinite(value)) { started = false; return; } if (started) context.lineTo(x(i), y(value)); else { context.moveTo(x(i), y(value)); started = true; } });
         context.stroke();
       }
+      drawBtcRanges(context, boundaries, left, top, width, bottom, y);
       const hover = state.hover >= state.start && state.hover < state.start + slots.length ? state.hover - state.start : -1;
       const row = hover >= 0 ? rows[hover] : valid.at(-1);
       if (hover >= 0) {
@@ -1273,7 +1324,9 @@
       const allMa20 = state.studies.ma20;
       const allBb = state.studies.bb;
       $("viewRange").textContent = `${rows[0].time.slice(5, 16)} → ${rows.at(-1).time.slice(5, 16)} · ${rows.length} / ${state.rows.length} 根`;
+      const boundaries = state.view === "btc" ? btcRangeBoundaries(state.rows) : [];
       const values = rows.flatMap((r) => [r.high, r.low]);
+      values.push(...boundaries.map(line => line.price));
       if (state.indicators.ma7) values.push(...allMa7.slice(state.start, end).filter(Number.isFinite));
       if (state.indicators.ma20) values.push(...allMa20.slice(state.start, end).filter(Number.isFinite));
       if (state.indicators.bb) allBb.slice(state.start, end).filter(Boolean).forEach((b) => values.push(b.upper, b.lower));
@@ -1332,6 +1385,8 @@
         const bodyHeight = Math.max(2, Math.abs(y(row.open) - y(row.close)));
         ctx.fillRect(cx - candleW / 2, bodyTop, candleW, bodyHeight);
       });
+
+      drawBtcRanges(ctx, boundaries, left, top, plotW, priceBottom, y);
 
       function line(valuesToDraw, color, width = 1.5) {
         ctx.strokeStyle = color;
@@ -1570,6 +1625,11 @@
     ui.chain.addEventListener("keydown", (event) => {
       if (["Enter", " "].includes(event.key) && event.target.matches("td[data-symbol]")) { event.preventDefault(); event.target.click(); }
     });
+    $("datasetMode").value = state.datasetMode;
+    $("datasetMode").addEventListener("change", () => {
+      state.datasetMode = $("datasetMode").value; state.file = ""; state.selected = ""; state.expiry = "all";
+      state.period = "1h"; ui.search.value = ""; saveSettings(); loadMeta();
+    });
     $("refresh").addEventListener("click", () => loadMeta({ preserveFile: true, preserveView: true }));
     function updateAutoButton() {
       $("autoRefresh").textContent = `自動重讀：${state.autoRefresh ? "30 秒" : "關"}`;
@@ -1733,6 +1793,33 @@
     updateMobileHelp();
     new ResizeObserver(resizeAndDraw).observe($("chartStage"));
     loadMeta({ preserveFile: !!state.file });
+
+    let importRevision = null;
+    let importPolling = false;
+    async function pollImportStatus() {
+      if (location.hostname.endsWith("github.io")) { $("importStatus").textContent = "雲端精簡資料模式（自動轉換請開本機 5083）"; return; }
+      if (importPolling || document.hidden) return;
+      importPolling = true;
+      try {
+        const response = await fetch("/api/import-status", {cache:"no-store",signal:AbortSignal.timeout(5000)});
+        if (!response.ok) throw new Error("後台連線失敗");
+        const data = await response.json();
+        $("importStatus").textContent = "自動轉換：" + (data.error ? data.error : data.stage || "啟動中");
+        $("importStatus").style.color = data.error ? "var(--up)" : "var(--muted)";
+        $("importStatus").title = "標記 ZIP：" + (data.sources?.data || "") + "\n幣安 CSV：" + (data.sources?.data1 || "");
+        if (!importRevision) importRevision = {};
+        const mode = state.datasetMode;
+        if (data.revision?.[mode] !== importRevision[mode] && !data.running && !state.busy && !state.dragging) {
+          await loadMeta({preserveFile:true,preserveView:true});
+          importRevision[mode] = data.revision[mode];
+        }
+      if (data.running || data.revision?.[mode] !== importRevision[mode]) setTimeout(pollImportStatus, 1500);
+      } catch (error) { $("importStatus").textContent = "自動轉換：後台連線中斷，請重新啟動"; }
+      finally { importPolling = false; }
+    }
+    pollImportStatus();
+
+
   </script>
   <script src="./pwa.js"></script>
 </body>

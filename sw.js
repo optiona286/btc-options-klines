@@ -1,5 +1,5 @@
 'use strict';
-const VERSION = 'btc-options-pwa-v2-compare';
+const VERSION = 'btc-options-pwa-v4-btc-ranges';
 const SHELL = VERSION + '-shell';
 const DATA = VERSION + '-data';
 const BASE = new URL('./', self.location.href);
@@ -16,7 +16,7 @@ self.addEventListener('fetch', event => {
   const url = new URL(request.url);
   if (request.method !== 'GET' || url.origin !== BASE.origin || !url.pathname.startsWith(BASE.pathname)) return;
   const isNavigation = request.mode === 'navigate';
-  const isData = url.pathname.startsWith(new URL('./data/', BASE).pathname);
+  const isData = ['data', 'data1'].some(mode => url.pathname.startsWith(new URL('./' + mode + '/', BASE).pathname));
   const canonical = new URL(url.pathname, BASE.origin).href;
   if (!isNavigation && !isData && !SHELL_URLS.has(canonical)) return;
   event.respondWith((async () => {

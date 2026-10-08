@@ -1,19 +1,20 @@
 (() => {
 'use strict';
-const dataCache=new Map(),btcCache=new Map();let manifest=null;
+const dataCache=new Map(),btcCache=new Map();let manifest=null, activeMode="data";
 function listDataFiles(){return manifest.files;}
 function resolveDataFile(name){const files=listDataFiles();if(!files.length)throw new Error('沒有精簡資料');return files.find(file=>file.name===name)||files[0];}
 function loadRows(name){const selected=resolveDataFile(name),cached=dataCache.get(selected.name);if(!cached)throw new Error('資料尚未載入');return {selected,...cached};}
-async function prepare(name,signal){
- if(!manifest){const response=await fetch(new URL('./data/manifest.json',document.baseURI),{signal,cache:'no-store'});if(!response.ok)throw new Error('到期日清單讀取失敗');manifest=await response.json();}
+async function prepare(name,signal,mode="data"){
+ if(activeMode!==mode){manifest=null;activeMode=mode;}
+ if(!manifest){const response=await fetch(new URL('./'+activeMode+'/manifest.json',document.baseURI),{signal,cache:'no-store'});if(!response.ok)throw new Error('到期日清單讀取失敗');manifest=await response.json();}
  const selected=resolveDataFile(name);if(dataCache.has(selected.name))return;
- const response=await fetch(new URL('./data/'+selected.path,document.baseURI),{signal});if(!response.ok)throw new Error('精簡資料下載失敗');
+ const response=await fetch(new URL('./'+activeMode+'/'+selected.path,document.baseURI),{signal});if(!response.ok)throw new Error('精簡資料下載失敗');
  const bytes=new Uint8Array(await response.arrayBuffer());
  const text=bytes[0]===31&&bytes[1]===139?await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text():new TextDecoder().decode(bytes);
  const content=JSON.parse(text),rows=[],bySymbol=new Map();
  for(const [symbol,bars] of Object.entries(content.symbols)){
- const match=symbol.match(/^BTC-\d{1,2}[A-Z]{3}\d{2}-(\d+(?:\.\d+)?)-([CP])-USDT$/);if(!match)throw new Error('合約格式錯誤');
- const items=bars.map(([time,closeTime,open,high,low,close])=>({symbol,expiryDate:content.expiry,strikePrice:Number(match[1]),side:match[2]==='C'?'CALL':'PUT',openTimeLocal:formatMarketTime(time,true),openTimeUtc:formatMarketTime(time),closeTimeLocal:formatMarketTime(closeTime,true),closeTimeUtc:formatMarketTime(closeTime),open,high,low,close,volume:null,quoteVolume:null,numberOfTrades:null,takerBuyVolume:null,takerBuyQuoteVolume:null}));bySymbol.set(symbol,items);rows.push(...items);
+ const match=symbol.match(/^BTC-(?:\d{1,2}[A-Z]{3}\d{2}|\d{6})-(\d+(?:\.\d+)?)-([CP])(?:-USDT)?$/);if(!match)throw new Error('合約格式錯誤');
+ const items=bars.map(([time,closeTime,open,high,low,close,volume=null,quoteVolume=null,numberOfTrades=null,takerBuyVolume=null,takerBuyQuoteVolume=null])=>({symbol,expiryDate:content.expiry,strikePrice:Number(match[1]),side:match[2]==='C'?'CALL':'PUT',openTimeLocal:formatMarketTime(time,true),openTimeUtc:formatMarketTime(time),closeTimeLocal:formatMarketTime(closeTime,true),closeTimeUtc:formatMarketTime(closeTime),open,high,low,close,volume,quoteVolume,numberOfTrades,takerBuyVolume,takerBuyQuoteVolume}));bySymbol.set(symbol,items);rows.push(...items);
  }
  rows.sort((a,b)=>a.openTimeUtc.localeCompare(b.openTimeUtc));dataCache.set(selected.name,{rows,bySymbol,symbols:buildSymbolInfo(rows)});while(dataCache.size>3)dataCache.delete(dataCache.keys().next().value);
 }
@@ -178,7 +179,7 @@ function getMeta(fileName) {
     symbols,
     expiries: [...new Set(symbols.map((item) => item.expiryDate))].sort(),
     chain: buildOptionChain(symbols),
-    periods: ["1h", "4h"],
+    periods: selected.interval === "15m" ? ["15m", "1h", "4h"] : ["1h", "4h"],
   };
 }
 
@@ -296,7 +297,7 @@ async function getBtcKlines(fileName, symbol, period, signal) {
 
 window.btcStaticApi=async function(requestedUrl,controller){
  const url=new URL(requestedUrl,'https://static.local'),signal=AbortSignal.any([controller.signal,AbortSignal.timeout(url.pathname==='/api/btc-klines'?50000:20000)]);
- await prepare(url.searchParams.get('file'),signal);signal.throwIfAborted();
+ await prepare(url.searchParams.get('file'),signal,url.searchParams.get('mode')||'data');signal.throwIfAborted();
  if(url.pathname==='/api/meta')return getMeta(url.searchParams.get('file'));
  if(url.pathname==='/api/klines')return getKlines(url.searchParams.get('file'),url.searchParams.get('symbol'),url.searchParams.get('period'));
  if(url.pathname==='/api/btc-klines')return getBtcKlines(url.searchParams.get('file'),url.searchParams.get('symbol'),url.searchParams.get('period'),signal);

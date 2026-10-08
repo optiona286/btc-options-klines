@@ -4,7 +4,7 @@ const path = require("path");
 
 const ROOT = __dirname;
 const HTML_PATH = path.join(ROOT, "index.html");
-const PORT = Number(process.env.PORT || 5080);
+const PORT = Number(process.env.PORT || 5083);
 // Small LRU cache. A changed source file is re-read on the next request.
 const dataCache = new Map();
 const btcCache = new Map();
@@ -32,18 +32,20 @@ function sendHtml(res) {
 }
 
 function listDataFiles() {
- const manifest=JSON.parse(fs.readFileSync(path.join(ROOT,'data','manifest.json'),'utf8'));
- return manifest.files;
+ const original=JSON.parse(fs.readFileSync(path.join(ROOT,'data','manifest.json'),'utf8')).files;
+ const extraPath=path.join(ROOT,'data1','manifest.json');
+ const extra=fs.existsSync(extraPath)?JSON.parse(fs.readFileSync(extraPath,'utf8')).files:[];
+ return [...original,...extra];
 }
 function resolveDataFile(name){const files=listDataFiles();if(!files.length)throw new Error('專案尚未包含精簡資料');return files.find(file=>file.name===name)||files[0];}
 function loadRows(name){
  const selected=resolveDataFile(name),cached=dataCache.get(selected.name);
- const stat=fs.statSync(path.join(ROOT,"data",selected.path)),signature=stat.size+":"+stat.mtimeMs;if(cached?.signature===signature)return {selected,...cached};
- const content=JSON.parse(require('zlib').gunzipSync(fs.readFileSync(path.join(ROOT,'data',selected.path))).toString('utf8'));
+ const stat=fs.statSync(path.join(ROOT,selected.name.startsWith("data1:")?"data1":"data",selected.path)),signature=stat.size+":"+stat.mtimeMs;if(cached?.signature===signature)return {selected,...cached};
+ const content=JSON.parse(require('zlib').gunzipSync(fs.readFileSync(path.join(ROOT,selected.name.startsWith('data1:')?'data1':'data',selected.path))).toString('utf8'));
  const rows=[],bySymbol=new Map();
  for(const [symbol,bars] of Object.entries(content.symbols)){
-  const match=symbol.match(/^BTC-\d{1,2}[A-Z]{3}\d{2}-(\d+(?:\.\d+)?)-([CP])-USDT$/);if(!match)throw new Error('精簡資料合約格式錯誤');
-  const items=bars.map(([time,closeTime,open,high,low,close])=>({symbol,expiryDate:content.expiry,strikePrice:Number(match[1]),side:match[2]==='C'?'CALL':'PUT',openTimeLocal:formatMarketTime(time,true),openTimeUtc:formatMarketTime(time),closeTimeLocal:formatMarketTime(closeTime,true),closeTimeUtc:formatMarketTime(closeTime),open,high,low,close,volume:null,quoteVolume:null,numberOfTrades:null,takerBuyVolume:null,takerBuyQuoteVolume:null}));
+  const match=symbol.match(/^BTC-(?:\d{1,2}[A-Z]{3}\d{2}|\d{6})-(\d+(?:\.\d+)?)-([CP])(?:-USDT)?$/);if(!match)throw new Error('精簡資料合約格式錯誤');
+  const items=bars.map(([time,closeTime,open,high,low,close,volume=null,quoteVolume=null,numberOfTrades=null,takerBuyVolume=null,takerBuyQuoteVolume=null])=>({symbol,expiryDate:content.expiry,strikePrice:Number(match[1]),side:match[2]==='C'?'CALL':'PUT',openTimeLocal:formatMarketTime(time,true),openTimeUtc:formatMarketTime(time),closeTimeLocal:formatMarketTime(closeTime,true),closeTimeUtc:formatMarketTime(closeTime),open,high,low,close,volume,quoteVolume,numberOfTrades,takerBuyVolume,takerBuyQuoteVolume}));
   bySymbol.set(symbol,items);rows.push(...items);
  }
  rows.sort((a,b)=>a.openTimeUtc.localeCompare(b.openTimeUtc));const entry={signature,rows,bySymbol,symbols:buildSymbolInfo(rows)};dataCache.set(selected.name,entry);while(dataCache.size>3)dataCache.delete(dataCache.keys().next().value);return {selected,...entry};
@@ -198,18 +200,21 @@ function buildOptionChain(symbols) {
   return [...byStrike.values()].sort((a, b) => a.expiryDate.localeCompare(b.expiryDate) || a.strikePrice - b.strikePrice);
 }
 
-function getMeta(fileName) {
+function getMeta(fileName, mode = "data") {
+  const files = listDataFiles().filter(f => f.name.startsWith("data1:") === (mode === "data1"));
+  if (!files.length) throw new Error("此模式尚無可用資料，請先轉換 data1 CSV");
+  if (!files.some(f => f.name === fileName)) fileName = files[0].name;
   const { selected, rows, symbols } = loadRows(fileName);
   return {
     ok: true,
     file: selected,
-    files: listDataFiles(),
+    files,
     rowCount: rows.length,
     symbolCount: symbols.length,
     symbols,
     expiries: [...new Set(symbols.map((item) => item.expiryDate))].sort(),
     chain: buildOptionChain(symbols),
-    periods: ["1h", "4h"],
+    periods: selected.interval === "15m" ? ["15m", "1h", "4h"] : ["1h", "4h"],
   };
 }
 
@@ -324,18 +329,20 @@ async function getBtcKlines(fileName, symbol, period, signal) {
   };
 }
 
+let sourceMonitor = null;
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host || `127.0.0.1:${PORT}`}`);
     if (url.pathname === "/static-api.js") {
       res.writeHead(200, {"Content-Type":"application/javascript; charset=utf-8"});return res.end(fs.readFileSync(path.join(ROOT,"static-api.js")));
     }
-    if (url.pathname === "/") return sendHtml(res);
+    if (url.pathname === "/") { sourceMonitor?.scan(); return sendHtml(res); }
     if (url.pathname === "/ping") {
       return sendJson(res, 200, { ok: true, appId: "btc-options-portable-1h", service: "BTC Options K 線系統", version: "2.1" });
     }
+    if (url.pathname === "/api/import-status") return sendJson(res,200,{ok:true,...sourceMonitor?.status()});
     if (url.pathname === "/api/meta") {
-      return sendJson(res, 200, getMeta(url.searchParams.get("file")));
+      return sendJson(res, 200, getMeta(url.searchParams.get("file"), url.searchParams.get("mode")));
     }
     if (url.pathname === "/api/btc-klines") {
       const controller = new AbortController();
@@ -367,5 +374,6 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, process.env.HOST || "127.0.0.1", () => {
+  sourceMonitor = require("./source-monitor.cjs")(ROOT);
   console.log(`BTC Options K 線系統：http://127.0.0.1:${PORT}`);
 });
