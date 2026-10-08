@@ -1,0 +1,1453 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <title>BTC / USD 1H 行情｜電腦版</title>
+  <script src="https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
+  <style>
+    :root{
+      --bg:#151d27;
+      --panel:#1c2632;
+      --panel-2:#202b38;
+      --line:#2b3745;
+      --text:#f2f5f8;
+      --muted:#909aa8;
+      --yellow:#f4ce3a;
+      --up:#29c39a;
+      --down:#f64e66;
+      --ma7:#e0ae24;
+      --ma25:#cb4daf;
+      --ma99:#8f7ac8;
+      --range:rgba(244,206,58,.075);
+      --range-border:rgba(244,206,58,.42);
+    }
+
+    *{box-sizing:border-box}
+    html,body{
+      margin:0;
+      min-height:100%;
+      background:#0f151d;
+      color:var(--text);
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+      -webkit-tap-highlight-color:transparent;
+    }
+    body{display:flex;justify-content:center}
+    button,input{font:inherit}
+    button{cursor:pointer}
+    .app{
+      width:100%;
+      max-width:540px;
+      min-height:100dvh;
+      background:var(--bg);
+      overflow:hidden;
+      position:relative;
+      border-left:1px solid rgba(255,255,255,.025);
+      border-right:1px solid rgba(255,255,255,.025);
+    }
+
+    .status-spacer{height:max(10px,env(safe-area-inset-top))}
+    .topbar{
+      height:58px;
+      display:flex;
+      align-items:center;
+      gap:12px;
+      padding:0 16px;
+      border-bottom:1px solid rgba(255,255,255,.035);
+    }
+    .back{
+      width:34px;height:34px;border:0;background:transparent;color:#e8edf2;
+      font-size:29px;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;
+    }
+    .symbol-wrap{min-width:0;flex:1}
+    .symbol{
+      font-weight:750;
+      letter-spacing:.1px;
+      font-size:22px;
+      line-height:1.15;
+    }
+    .subsymbol{
+      color:var(--muted);
+      font-size:11px;
+      margin-top:3px;
+    }
+    .live-dot{
+      width:7px;height:7px;border-radius:50%;
+      background:var(--up);
+      box-shadow:0 0 0 3px rgba(41,195,154,.12);
+      margin-right:2px;
+    }
+    .tf-pill{
+      border:1px solid #3a4654;
+      background:#202a35;
+      color:#fff;
+      min-width:43px;
+      height:31px;
+      border-radius:7px;
+      font-weight:700;
+      font-size:13px;
+    }
+
+    .tabs{
+      display:flex;
+      gap:28px;
+      height:48px;
+      align-items:flex-end;
+      padding:0 18px;
+      border-bottom:1px solid rgba(255,255,255,.03);
+    }
+    .tab{
+      height:48px;
+      display:flex;
+      align-items:center;
+      color:#929ca9;
+      position:relative;
+      font-size:16px;
+      font-weight:600;
+    }
+    .tab.active{color:#fff}
+    .tab.active:after{
+      content:"";
+      position:absolute;
+      left:0;right:0;bottom:0;
+      height:4px;border-radius:3px 3px 0 0;
+      background:var(--yellow);
+    }
+
+    .quote{
+      padding:15px 18px 11px;
+      display:grid;
+      grid-template-columns:1.15fr .85fr;
+      gap:14px;
+      border-bottom:1px solid rgba(255,255,255,.025);
+    }
+    .last-label{
+      color:#9aa4b1;font-size:12px;margin-bottom:3px;
+    }
+    .last-price{
+      font-size:34px;
+      line-height:1.05;
+      font-weight:720;
+      color:var(--up);
+      letter-spacing:.2px;
+      font-variant-numeric:tabular-nums;
+    }
+    .last-price.down{color:var(--down)}
+    .change-line{
+      margin-top:6px;
+      display:flex;gap:8px;align-items:center;
+      font-size:12px;color:#b7c0ca;
+      font-variant-numeric:tabular-nums;
+    }
+    .change{
+      color:var(--up);font-weight:700;
+    }
+    .change.down{color:var(--down)}
+    .stats{
+      display:grid;
+      grid-template-columns:1fr auto;
+      row-gap:5px;column-gap:10px;
+      align-content:center;
+      font-size:12px;
+      color:#9da7b4;
+    }
+    .stats b{
+      color:#e6ebef;
+      text-align:right;
+      font-weight:600;
+      font-variant-numeric:tabular-nums;
+    }
+
+    .controls{
+      padding:11px 12px 10px;
+      background:linear-gradient(180deg,rgba(255,255,255,.012),transparent);
+      border-bottom:1px solid rgba(255,255,255,.035);
+    }
+    .control-row{
+      display:grid;
+      grid-template-columns:36px minmax(0,1fr) 36px 76px;
+      gap:7px;
+      align-items:center;
+    }
+    .navbtn,.rangebtn{
+      height:38px;border-radius:8px;
+      border:1px solid #344150;
+      color:#dce2e8;background:#202a35;
+      font-weight:700;
+    }
+    .navbtn{font-size:19px}
+    .rangebtn{
+      color:var(--yellow);
+      border-color:rgba(244,206,58,.38);
+      background:rgba(244,206,58,.055);
+      font-size:12px;
+    }
+    .rangebtn.off{
+      color:#9ba5b2;border-color:#344150;background:#202a35;
+    }
+    .datebox{
+      height:38px;
+      border:1px solid #344150;
+      background:#202a35;
+      color:#f5f7fa;
+      border-radius:8px;
+      padding:0 9px;
+      width:100%;
+      min-width:0;
+      outline:none;
+      color-scheme:dark;
+      font-weight:650;
+      font-size:14px;
+    }
+    .window{
+      margin-top:8px;
+      display:flex;
+      align-items:center;
+      gap:6px;
+      white-space:nowrap;
+      overflow:hidden;
+      color:#8f99a7;
+      font-size:11px;
+    }
+    .window strong{color:#cdd4dc;font-weight:600}
+    .window .sep{color:#596473}
+    .window .tail{margin-left:auto;color:#b8a74d}
+
+    .periods{
+      height:45px;
+      display:flex;
+      align-items:center;
+      gap:23px;
+      padding:0 17px;
+      color:#929ca8;
+      border-bottom:1px solid var(--line);
+      font-size:15px;
+      font-weight:600;
+    }
+    .periods [data-interval]{cursor:pointer}
+    .periods .active{color:#fff}
+    .periods .active:after{
+      content:"";
+      display:block;
+      height:2px;background:var(--yellow);
+      margin-top:8px;border-radius:2px;
+    }
+
+    .indicator-row{
+      height:34px;
+      display:flex;
+      align-items:center;
+      padding:0 12px;
+      gap:12px;
+      overflow:hidden;
+      white-space:nowrap;
+      color:#9ca5b1;
+      font-size:11px;
+      font-variant-numeric:tabular-nums;
+    }
+    .ma7{color:var(--ma7)}
+    .ma25{color:var(--ma25)}
+    .ma99{color:var(--ma99)}
+
+    .chart-wrap{
+      position:relative;
+      height:min(58dvh,560px);
+      min-height:400px;
+      background:var(--bg);
+    }
+    #chart{
+      position:absolute;
+      inset:0;
+      z-index:1;
+    }
+    #rangeOverlay{
+      position:absolute;
+      top:0;
+      bottom:26px;
+      display:none;
+      pointer-events:none;
+      z-index:3;
+      background:var(--range);
+      border-left:1px solid var(--range-border);
+      border-right:1px solid var(--range-border);
+    }
+    #rangeOverlay .range-label{
+      position:absolute;
+      top:7px;
+      left:7px;
+      color:#f4d75f;
+      border:1px solid rgba(244,206,58,.30);
+      background:rgba(22,29,39,.82);
+      padding:3px 6px;
+      border-radius:5px;
+      font-size:10px;
+      font-weight:700;
+      backdrop-filter:blur(4px);
+    }
+    #loading{
+      position:absolute;
+      inset:0;
+      z-index:10;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      background:rgba(21,29,39,.82);
+      color:#dbe1e7;
+      font-size:13px;
+    }
+    .spinner{
+      width:20px;height:20px;
+      border:2px solid #46515e;border-top-color:var(--yellow);
+      border-radius:50%;
+      animation:spin .8s linear infinite;margin-right:9px;
+    }
+    @keyframes spin{to{transform:rotate(360deg)}}
+    #errorBox{
+      position:absolute;
+      left:14px;right:14px;top:14px;
+      z-index:11;
+      display:none;
+      border:1px solid rgba(246,78,102,.36);
+      background:rgba(70,26,34,.92);
+      color:#ffc8d0;
+      padding:10px 12px;
+      border-radius:8px;
+      font-size:12px;
+      line-height:1.45;
+    }
+
+    .bottom-info{
+      min-height:49px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:8px 14px calc(8px + env(safe-area-inset-bottom));
+      border-top:1px solid var(--line);
+      background:#18212b;
+      font-size:11px;
+      color:#919ba8;
+      gap:10px;
+    }
+    .api-state{display:flex;align-items:center;gap:6px;min-width:0}
+    .api-state .dot{
+      width:6px;height:6px;border-radius:50%;background:#6f7b88;flex:0 0 auto;
+    }
+    .api-state.ok .dot{background:var(--up)}
+    .api-state.err .dot{background:var(--down)}
+    .api-state span{
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    }
+    .bars{white-space:nowrap;color:#c6ced6}
+
+    @media (max-width:360px){
+      .quote{grid-template-columns:1fr;gap:10px}
+      .stats{grid-template-columns:1fr auto}
+      .last-price{font-size:31px}
+      .chart-wrap{min-height:380px}
+      .periods{gap:17px}
+      .control-row{grid-template-columns:34px minmax(0,1fr) 34px 70px}
+    }
+      .control-row {
+      grid-template-columns:42px minmax(0,1fr) 42px;
+      grid-template-areas:"mode mode mode" "prev date next" "range range range";
+      gap:8px;
+      min-width:0;
+    }
+    #dateMode { grid-area:mode; width:100%; min-width:0; max-width:100%; }
+    #dateInput { grid-area:date; width:100%; min-width:0; max-width:100%; font-size:13px; }
+    #calendarDate { grid-area:date; width:100%; min-width:0; max-width:100%; font-size:13px; }
+    #dateInput[hidden], #calendarDate[hidden] { display:none !important; }
+    #prevDay { grid-area:prev; }
+    #nextDay { grid-area:next; }
+    #rangeBtn { grid-area:range; width:100%; }
+    .navbtn:disabled { opacity: .35; cursor: default; }
+    .range-summary{margin:16px;padding:16px;background:var(--panel);border:1px solid var(--range-border);border-radius:8px}
+    .range-summary h2{margin:0 0 10px;color:var(--yellow);font-size:16px}
+    .range-summary .range-period{color:var(--muted);font-size:12px;line-height:1.6;margin-bottom:12px}
+    .range-summary dl{display:grid;grid-template-columns:1fr auto;gap:12px;margin:0;font-size:14px}
+    .range-summary dt{color:var(--muted)}
+    .range-summary dd{margin:0;font-weight:700;font-variant-numeric:tabular-nums}
+</style>
+
+  <style id="desktop-overrides">
+    html,body{min-width:1180px;overflow:auto;background:#0d131b}
+    body{display:block}
+    .app{
+      width:100%;max-width:none;min-height:100vh;
+      display:grid;
+      grid-template-columns:330px minmax(0,1fr);
+      grid-template-rows:64px 48px 46px 34px minmax(650px,calc(100vh - 230px)) 38px;
+      grid-template-areas:
+        "top top"
+        "tabs tabs"
+        "sidebar periods"
+        "sidebar indicator"
+        "sidebar chart"
+        "bottom bottom";
+      border:0;background:#111923;
+    }
+    .status-spacer{display:none}
+    .topbar{
+      grid-area:top;height:64px;padding:0 22px;background:#111923;
+      border-bottom:1px solid #2b3745;
+    }
+    .symbol{font-size:23px}
+    .subsymbol{font-size:12px}
+    .tabs{
+      grid-area:tabs;height:48px;align-items:flex-end;padding:0 24px;gap:34px;
+      background:#151d27;border-bottom:1px solid #2b3745;
+    }
+    .tab{height:48px;font-size:15px}
+    .quote{
+      grid-area:quote;
+      min-height:280px;
+      display:block;
+      padding:18px 20px 16px;
+      background:#121a24;
+      border-right:1px solid #2b3745;
+      border-bottom:1px solid #2b3745;
+    }
+    .last-label{font-size:12px;margin-bottom:6px}
+    .last-price{font-size:43px}
+    .change-line{margin-top:8px;font-size:12px}
+    .stats{
+      margin-top:20px;
+      grid-template-columns:1fr auto;
+      row-gap:9px;column-gap:12px;
+      font-size:12px;
+    }
+    .controls{
+      grid-area:controls;
+      padding:18px 18px 16px;
+      background:#121a24;
+      border-right:1px solid #2b3745;
+      border-bottom:0;
+      align-self:stretch;
+    }
+    .control-row{
+      grid-template-columns:42px minmax(0,1fr) 42px;
+      gap:8px;
+    }
+    .rangebtn{
+      grid-column:1/-1;
+      margin-top:3px;
+      height:40px;
+    }
+    .navbtn,.datebox{height:42px}
+    .window{
+      margin-top:14px;
+      display:block;
+      line-height:1.75;
+      white-space:normal;
+      padding:12px;
+      border:1px solid #2e3a49;
+      border-radius:8px;
+      background:#18222e;
+    }
+    .window strong{display:inline-block;min-width:108px;margin:0 4px}
+    .window .sep{display:none}
+    .window .tail{display:block;margin:5px 0 0;color:#c3ad49}
+    .periods{
+      grid-area:periods;height:46px;padding:0 16px;gap:10px;
+      background:#151d27;border-bottom:1px solid #2b3745;
+    }
+    .periods span{
+      min-width:58px;height:31px;display:flex;align-items:center;justify-content:center;
+      border-radius:6px;
+    }
+    .periods .active{
+      background:#202a35;border:1px solid #3a4654;color:#fff;
+    }
+    .periods .active:after{display:none}
+    .indicator-row{
+      grid-area:indicator;height:34px;padding:0 16px;gap:20px;
+      background:#151d27;border-bottom:1px solid #2b3745;
+    }
+    .crosshair-info{
+      position:absolute;
+      top:10px;left:14px;right:86px;
+      min-height:46px;
+      display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+      padding:9px 14px;
+      z-index:6;
+      pointer-events:none;
+      background:rgba(18,26,36,.95);
+      border:1px solid rgba(104,120,139,.82);
+      border-radius:8px;
+      box-shadow:0 5px 20px rgba(0,0,0,.24);
+      backdrop-filter:blur(7px);
+      white-space:nowrap;
+      overflow:hidden;
+      font-size:13px;
+      font-weight:650;
+      font-variant-numeric:tabular-nums;
+    }
+    .crosshair-info .item{display:flex;align-items:center;gap:6px;color:#a6b0bd}
+    .crosshair-info .item b{color:#f5f7fa;font-size:15px;font-weight:800;letter-spacing:.1px}
+    .crosshair-info .time b{color:#f4ce3a}
+    .crosshair-info .rise b{color:#29c39a}
+    .crosshair-info .fall b{color:#f64e66}
+    .chart-wrap{
+      grid-area:chart;
+      height:auto;min-height:650px;
+      background:#151d27;
+    }
+    #rangeOverlay{bottom:28px}
+    .bottom-info{
+      grid-area:bottom;
+      min-height:38px;height:38px;
+      padding:0 18px;
+      border-top:1px solid #2b3745;
+      background:#111923;
+    }
+    @media (min-width:1500px){
+      .app{grid-template-columns:360px minmax(0,1fr)}
+      .last-price{font-size:47px}
+      .chart-wrap{min-height:720px}
+    }
+      .control-row {
+      grid-template-columns:42px minmax(0,1fr) 42px;
+      grid-template-areas:"mode mode mode" "prev date next" "range range range";
+      gap:8px;
+      min-width:0;
+    }
+    #dateMode { grid-area:mode; width:100%; min-width:0; max-width:100%; }
+    #dateInput { grid-area:date; width:100%; min-width:0; max-width:100%; font-size:13px; }
+    #calendarDate { grid-area:date; width:100%; min-width:0; max-width:100%; font-size:13px; }
+    #dateInput[hidden], #calendarDate[hidden] { display:none !important; }
+    #prevDay { grid-area:prev; }
+    #nextDay { grid-area:next; }
+    #rangeBtn { grid-area:range; width:100%; }
+    .navbtn:disabled { opacity: .35; cursor: default; }
+    .range-summary{margin:16px;padding:16px;background:var(--panel);border:1px solid var(--range-border);border-radius:8px}
+    .range-summary h2{margin:0 0 10px;color:var(--yellow);font-size:16px}
+    .range-summary .range-period{color:var(--muted);font-size:12px;line-height:1.6;margin-bottom:12px}
+    .range-summary dl{display:grid;grid-template-columns:1fr auto;gap:12px;margin:0;font-size:14px}
+    .range-summary dt{color:var(--muted)}
+    .range-summary dd{margin:0;font-weight:700;font-variant-numeric:tabular-nums}
+</style>
+
+<style id="independent-sidebar-layout">
+  .sidebar { grid-area:sidebar; display:flex; flex-direction:column; min-width:0; min-height:0; height:calc(100dvh - 150px); overflow-y:scroll; overflow-x:hidden; scrollbar-gutter:stable; background:#121a24; }
+  .sidebar > section { flex:0 0 auto; }
+  .sidebar { scrollbar-width:auto; scrollbar-color:#64748b #121a24; }
+  .sidebar::-webkit-scrollbar { width:12px; }
+  .sidebar::-webkit-scrollbar-track { background:#121a24; }
+  .sidebar::-webkit-scrollbar-thumb { background:#64748b; border:3px solid #121a24; border-radius:8px; }
+  .sidebar .quote { grid-area:auto; min-height:280px; flex:0 0 auto; }
+  .sidebar .controls { grid-area:auto; flex:0 0 auto; min-width:0; }
+    .range-summary{margin:16px;padding:16px;background:var(--panel);border:1px solid var(--range-border);border-radius:8px}
+    .range-summary h2{margin:0 0 10px;color:var(--yellow);font-size:16px}
+    .range-summary .range-period{color:var(--muted);font-size:12px;line-height:1.6;margin-bottom:12px}
+    .range-summary dl{display:grid;grid-template-columns:1fr auto;gap:12px;margin:0;font-size:14px}
+    .range-summary dt{color:var(--muted)}
+    .range-summary dd{margin:0;font-weight:700;font-variant-numeric:tabular-nums}
+</style>
+<style>
+#openingRangeFill{position:absolute;display:none;pointer-events:none;z-index:3;background:linear-gradient(180deg,rgba(157,123,255,.18) 0%,rgba(157,123,255,.32) 50%,rgba(157,123,255,.18) 100%);border-top:1px solid rgba(185,154,255,.55);border-bottom:1px solid rgba(185,154,255,.55);}
+</style>
+<style>.option-mark{position:absolute;z-index:7;pointer-events:none;font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;padding:2px 7px;border-radius:4px;background:rgba(15,21,29,.88);white-space:nowrap;}</style>
+<style id="responsive-layout">
+  html,body{min-width:0;}
+  .app,.sidebar,.chart-wrap{min-width:0;}
+  button,input,select{touch-action:manipulation;}
+  @media(max-width:1179px) and (min-width:1001px){
+    .app{grid-template-columns:260px minmax(0,1fr);grid-template-rows:64px 48px 46px 34px minmax(500px,calc(100dvh - 230px)) 38px;}
+    .sidebar .quote{padding:16px;min-height:240px;}
+    .last-price{font-size:34px;}
+    .controls{padding:12px;}
+    .range-summary{margin:12px;padding:12px;}
+    .range-summary dl{font-size:13px;gap:10px;}
+    .chart-wrap{min-height:500px;}
+    .crosshair-info{gap:10px;padding:7px 10px;font-size:11px;}
+    .crosshair-info .item b{font-size:12px;}
+  }
+  @media(max-width:1000px){
+    .app{grid-template-columns:minmax(0,1fr);grid-template-rows:60px 44px auto auto 46px 34px minmax(460px,60dvh) auto auto;grid-template-areas:"top" "tabs" "quote" "controls" "periods" "indicator" "chart" "stats" "bottom";overflow:visible;}
+    .sidebar{display:contents;}
+    .sidebar .quote{grid-area:quote;display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,1fr);gap:16px;min-height:0;padding:14px 20px;border-right:0;}
+    .last-price{font-size:36px;}
+    .stats{margin-top:0;gap:6px 12px;}
+    .sidebar .controls{grid-area:controls;padding:10px 20px;border-right:0;}
+    .controls>div:first-child{margin-bottom:8px!important;max-width:400px;}
+    .control-row{grid-template-columns:40px minmax(110px,1fr) minmax(130px,1fr) minmax(130px,1fr) 40px 110px;grid-template-areas:"prev mode date calendar next range";gap:8px;}
+    #prevDay{grid-area:prev;}#dateMode{grid-area:mode;}#dateInput{grid-area:date;}#calendarDate{grid-area:calendar;}#nextDay{grid-area:next;}#rangeBtn{grid-area:range;}
+    .datebox,.navbtn,.rangebtn{min-height:42px;font-size:14px;}
+    .window{margin-top:8px;padding:6px 10px;font-size:11px;display:flex;flex-wrap:wrap;gap:4px;}
+    .window strong{min-width:0;margin:0;}
+    .window .sep{display:inline;}.window .tail{margin:0 0 0 auto;}
+    .chart-wrap{height:60dvh;min-height:460px;}
+    .crosshair-info{top:8px;left:8px;right:86px;flex-wrap:nowrap;gap:14px;overflow-x:auto;pointer-events:auto;scrollbar-width:thin;padding:7px 10px;min-height:42px;max-height:56px;font-size:11px;}
+    .crosshair-info .item{flex-shrink:0;}.crosshair-info .item b{font-size:13px;}
+    .range-summary{grid-area:stats;margin:14px 20px;padding:16px;}
+    .range-summary dl{grid-template-columns:1fr auto 1fr auto;gap:14px 20px;}
+    .range-summary dd{overflow-wrap:anywhere;}
+    .periods,.indicator-row{overflow-x:auto;white-space:nowrap;scrollbar-width:none;}
+    .periods span,.indicator-row span{flex-shrink:0;}
+    .bottom-info{height:auto;min-height:38px;gap:10px;flex-wrap:wrap;}
+  }
+  @media(max-width:600px){
+    .app{grid-template-rows:56px 42px auto auto 44px 32px minmax(420px,62dvh) auto auto;}
+    .topbar{height:56px;padding:0 12px;gap:8px;}.symbol{font-size:19px;}.subsymbol{font-size:10px;}
+    .tabs{height:42px;padding:0 14px;gap:26px;}.tab{height:42px;font-size:14px;}
+    .sidebar .quote{grid-template-columns:minmax(0,1fr) minmax(145px,1fr);gap:10px;padding:12px;}
+    .last-price{font-size:28px;}.last-label{font-size:10px;}.change-line{font-size:10px;flex-wrap:wrap;}
+    .stats{font-size:11px;gap:5px 6px;}.stats b{font-size:12px;}
+    .sidebar .controls{padding:10px 12px;}
+    .control-row{grid-template-columns:36px minmax(0,1fr) 36px;grid-template-areas:"mode mode mode" "prev date next" "calendar calendar range";}
+    #calendarDate{min-width:0;}.datebox{width:100%;font-size:16px;}
+    .window .tail{flex-basis:100%;margin:0;}
+    .chart-wrap{height:62dvh;min-height:420px;}
+    .periods{padding:0 8px;gap:4px;height:44px;font-size:13px;}
+    .indicator-row{padding:0 10px;gap:14px;font-size:11px;height:32px;}
+    .range-summary{margin:12px;padding:14px;}.range-summary dl{grid-template-columns:1fr auto;gap:12px;font-size:13px;}
+    .option-mark{font-size:14px;}
+  }
+</style>
+</head>
+<body>
+  <main class="app">
+    <div class="status-spacer"></div>
+
+    <header class="topbar">
+      <button class="back" aria-label="返回">‹</button>
+      <div class="symbol-wrap">
+        <div class="symbol">BTC / USD</div>
+        <div class="subsymbol">Binance BTCUSDT · 現貨歷史行情</div>
+      </div>
+      <div class="live-dot" title="API"></div>
+      <button class="tf-pill">1H</button>
+    </header>
+
+    <nav class="tabs">
+      <div class="tab active">價格</div>
+      <div class="tab">資訊</div>
+      <div class="tab">交易數據</div>
+    </nav>
+
+    <aside class="sidebar"><section class="quote">
+      <div>
+        <div class="last-label">區間最後價格</div>
+        <div id="lastPrice" class="last-price">--</div>
+        <div class="change-line">
+          <span id="lastTime">台灣時間 --</span>
+          <span id="changePct" class="change">--</span>
+        </div>
+      </div>
+      <div class="stats">
+        <span>24h 高</span><b id="high24">--</b>
+        <span>24h 低</span><b id="low24">--</b>
+        <span>24h 成交量</span><b id="vol24">--</b>
+        <span>資料週期</span><b id="dataPeriod">1 小時</b>
+      </div>
+    </section>
+
+    <section class="controls">
+      <div style="display:flex;gap:8px;margin-bottom:12px"><button id="liveBtn" class="rangebtn" style="flex:1">即時行情</button><button id="liveRefreshBtn" class="rangebtn" style="flex:1" hidden>立即更新</button></div><div id="liveStatus" style="font-size:12px;color:var(--muted);margin-bottom:10px" hidden>每 1 秒更新，末根 K 線尚未收盤</div>
+      <div class="control-row">
+        <button id="prevDay" class="navbtn" aria-label="前一天">‹</button>
+        <select id="dateMode" class="datebox" aria-label="日期模式"><option value="all">全部日期</option><option value="monday">週一模式</option><option value="weekdays">週一到週五模式</option><option value="weekend">假日模式（六、日）</option></select>
+        <select id="dateInput" class="datebox" aria-label="選擇日期"></select><input id="calendarDate" class="datebox" type="date" aria-label="日曆選擇日期" />
+        <button id="nextDay" class="navbtn" aria-label="後一天">›</button>
+        <button id="rangeBtn" class="rangebtn">24H 標記</button>
+      </div>
+      <div class="window">
+        <span>範圍</span>
+        <strong id="startLabel">--</strong>
+        <span class="sep">→</span>
+        <strong id="endLabel">--</strong>
+        <span class="tail">固定 16:00</span>
+      </div>
+    </section>
+    <section class="range-summary" aria-label="24 小時標記區間統計">
+      <h2>24 小時統計</h2>
+      <div class="range-period" style="color:#b99aff">首棒範圍 ≥200 點（紫色虛線）<br><span id="openingRangeInfo">--</span></div>
+      <div id="rangeStatsPeriod" class="range-period">--</div>
+      <dl>
+        <dt>開盤價</dt><dd><span id="rangeStatsOpen">--</span><small id="rangeStatsOpenCompare" style="display:block;max-width:190px;margin-top:6px;color:var(--yellow);font-size:12px;line-height:1.6;white-space:normal">--</small></dd>
+        <dt>收盤價</dt><dd id="rangeStatsClose">--</dd>
+        <dt>最高價</dt><dd id="rangeStatsHigh">--</dd>
+        <dt>最低價</dt><dd id="rangeStatsLow">--</dd>
+        <dt>高低差</dt><dd id="rangeStatsDiff">--</dd>
+        <dt>振幅</dt><dd id="rangeStatsAmp" title="（最高價 − 最低價）÷ 開盤價 × 100%">--</dd>
+      </dl>
+    </section></aside>
+
+    <div class="periods">
+      <span>分時</span>
+      <span data-interval="15m" role="button" tabindex="0">15分</span>
+      <span data-interval="1h" role="button" tabindex="0" class="active">1小時</span>
+      <span data-interval="4h" role="button" tabindex="0">4小時</span>
+      <span>日線</span>
+      <span>更多</span>
+    </div>
+
+    <div class="indicator-row">
+      <span id="ma7" class="ma7">MA(7): --</span>
+      <span id="ma25" class="ma25">MA(25): --</span>
+      <span id="ma99" class="ma99">MA(99): --</span>
+    </div>
+
+    <section id="chartWrap" class="chart-wrap">
+      <div id="chart"></div>
+      <div id="crosshairInfo" class="crosshair-info">
+        <span class="item time">時間 <b id="ciTime">--</b></span>
+        <span class="item">開 <b id="ciOpen">--</b></span>
+        <span class="item">高 <b id="ciHigh">--</b></span>
+        <span class="item">低 <b id="ciLow">--</b></span>
+        <span class="item">收 <b id="ciClose">--</b></span>
+        <span id="ciChangeWrap" class="item">漲跌 <b id="ciChange">--</b></span>
+        <span class="item">高低差 <b id="ciRange">--</b></span>
+        <span id="ciNetRangeWrap" class="item">相抵差額 <b id="ciNetRange">--</b></span>
+        <span class="item">振幅 <b id="ciAmp">--</b></span>
+        <span class="item">量 <b id="ciVol">--</b></span>
+      </div>
+      <div id="optionMark0" class="option-mark" hidden></div><div id="optionMark1" class="option-mark" hidden></div><div id="optionMark2" class="option-mark" hidden></div><div id="optionMark3" class="option-mark" hidden></div><div id="openingRangeFill" aria-hidden="true"></div>
+      <div id="rangeOverlay"><div class="range-label">最後 24 小時</div></div>
+      <div id="loading"><div class="spinner"></div><span>抓取 BTC 1H K 線…</span></div>
+      <div id="errorBox"></div>
+    </section>
+
+    <footer class="bottom-info">
+      <div id="apiState" class="api-state">
+        <i class="dot"></i><span>等待資料</span>
+      </div>
+      <div id="barCount" class="bars">0 根 K</div>
+    </footer>
+  </main>
+
+<script>
+(() => {
+  'use strict';
+
+  const TZ = 'Asia/Taipei';
+  const HOUR = 60 * 60 * 1000;
+  const TOTAL_HOURS = 72;
+  const RANGE_HOURS = 24;
+
+  const dateInput = document.getElementById('dateInput');
+  const dateMode = document.getElementById('dateMode');
+  const calendarDate = document.getElementById('calendarDate');
+  const prevDay = document.getElementById('prevDay');
+  const nextDay = document.getElementById('nextDay');
+  const rangeBtn = document.getElementById('rangeBtn');
+  const startLabel = document.getElementById('startLabel');
+  const endLabel = document.getElementById('endLabel');
+  const lastPriceEl = document.getElementById('lastPrice');
+  const lastTimeEl = document.getElementById('lastTime');
+  const changePctEl = document.getElementById('changePct');
+  const high24El = document.getElementById('high24');
+  const low24El = document.getElementById('low24');
+  const vol24El = document.getElementById('vol24');
+  const ma7El = document.getElementById('ma7');
+  const ma25El = document.getElementById('ma25');
+  const ma99El = document.getElementById('ma99');
+  const loading = document.getElementById('loading');
+  const errorBox = document.getElementById('errorBox');
+  const apiState = document.getElementById('apiState');
+  const barCount = document.getElementById('barCount');
+  const chartWrap = document.getElementById('chartWrap');
+  const rangeOverlay = document.getElementById('rangeOverlay');
+  const ciTime = document.getElementById('ciTime');
+  const ciOpen = document.getElementById('ciOpen');
+  const ciHigh = document.getElementById('ciHigh');
+  const ciLow = document.getElementById('ciLow');
+  const ciClose = document.getElementById('ciClose');
+  const ciChange = document.getElementById('ciChange');
+  const ciChangeWrap = document.getElementById('ciChangeWrap');
+  const ciRange = document.getElementById('ciRange');
+  const ciNetRange = document.getElementById('ciNetRange');
+  const ciNetRangeWrap = document.getElementById('ciNetRangeWrap');
+  const ciAmp = document.getElementById('ciAmp');
+  const ciVol = document.getElementById('ciVol');
+
+  let liveMode = false;
+  let loadingData = false;
+  let liveTimer = null;
+  let selectedInterval = '1h';
+  let loadVersion = 0;
+  let showRange = true;
+  let currentBars = [];
+  let currentEndMs = 0;
+
+  function liveContractDate(now = Date.now()) {
+    // Daily contract settles at Taipei 16:00: after settlement use the next contract.
+    return new Date(now + 16 * HOUR).toISOString().slice(0,10);
+  }
+
+  function taiwanToday() {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: TZ, year:'numeric', month:'2-digit', day:'2-digit'
+    }).formatToParts(new Date());
+    const obj = Object.fromEntries(parts.map(p => [p.type, p.value]));
+    return `${obj.year}-${obj.month}-${obj.day}`;
+  }
+
+  function taipei16(dateStr) {
+    return new Date(`${dateStr}T16:00:00+08:00`);
+  }
+
+  function fmtMDHM(ms) {
+    return new Intl.DateTimeFormat('zh-TW', {
+      timeZone: TZ, month:'2-digit', day:'2-digit',
+      hour:'2-digit', minute:'2-digit', hour12:false
+    }).format(new Date(ms));
+  }
+
+  function fmtFull(ms) {
+    return new Intl.DateTimeFormat('zh-TW', {
+      timeZone: TZ, month:'2-digit', day:'2-digit',
+      hour:'2-digit', minute:'2-digit', hour12:false
+    }).format(new Date(ms));
+  }
+
+  function fmtPrice(v) {
+    if (!Number.isFinite(v)) return '--';
+    return v.toLocaleString('en-US', {maximumFractionDigits:2});
+  }
+
+  function fmtVolume(v) {
+    if (!Number.isFinite(v)) return '--';
+    if (v >= 1_000_000) return (v/1_000_000).toFixed(2)+'M';
+    if (v >= 1_000) return (v/1_000).toFixed(2)+'K';
+    return v.toFixed(2);
+  }
+
+  function shiftDate(dateStr, days) {
+    const d = new Date(`${dateStr}T12:00:00+08:00`);
+    d.setUTCDate(d.getUTCDate() + days);
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: TZ, year:'numeric', month:'2-digit', day:'2-digit'
+    }).formatToParts(d);
+    const o = Object.fromEntries(parts.map(p => [p.type,p.value]));
+    return `${o.year}-${o.month}-${o.day}`;
+  }
+
+  const chart = LightweightCharts.createChart(document.getElementById('chart'), {
+    width: chartWrap.clientWidth,
+    height: chartWrap.clientHeight,
+    layout: {
+      background: { type: 'solid', color: '#151d27' },
+      textColor: '#8f99a7',
+      fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC","Microsoft JhengHei",sans-serif',
+      fontSize: 11,
+    },
+    grid: {
+      vertLines: { color: '#26313e' },
+      horzLines: { color: '#26313e' },
+    },
+    rightPriceScale: {
+      borderColor: '#33404e',
+      scaleMargins: { top: 0.16, bottom: 0.25 },
+      minimumWidth: 58,
+    },
+    timeScale: {
+      borderColor: '#33404e',
+      timeVisible: true,
+      secondsVisible: false,
+      rightOffset: 2,
+      barSpacing: 8,
+      minBarSpacing: 4,
+      tickMarkFormatter: (time) => {
+        const ms = Number(time) * 1000;
+        return fmtMDHM(ms);
+      },
+    },
+    crosshair: {
+      mode: LightweightCharts.CrosshairMode.Normal,
+      vertLine: {
+        color: '#97a2af',
+        width: 1,
+        style: LightweightCharts.LineStyle.Dashed,
+        labelBackgroundColor: '#e8ebee',
+      },
+      horzLine: {
+        color: '#697482',
+        width: 1,
+        style: LightweightCharts.LineStyle.Dashed,
+        labelBackgroundColor: '#e8ebee',
+      },
+    },
+    localization: {
+      timeFormatter: (time) => fmtFull(Number(time) * 1000),
+      priceFormatter: (price) => fmtPrice(price),
+    },
+    handleScroll: {
+      mouseWheel: true,
+      pressedMouseMove: true,
+      horzTouchDrag: true,
+      vertTouchDrag: false,
+    },
+    handleScale: {
+      axisPressedMouseMove: true,
+      mouseWheel: true,
+      pinch: true,
+    },
+  });
+
+  const candleSeries = chart.addCandlestickSeries({
+    upColor: '#29c39a',
+    downColor: '#f64e66',
+    borderVisible: false,
+    wickUpColor: '#29c39a',
+    wickDownColor: '#f64e66',
+    priceLineVisible: true,
+    priceLineColor: '#dce2e7',
+    priceLineWidth: 1,
+    lastValueVisible: true,
+  });
+
+  let idealRangeLines = [];
+  let optionBoundaries = [];
+  let optionContracts = [], optionContractFetched = 0, optionBusy = false, optionEpoch = 0;
+  const optionValues = new Map();
+  let openingRangeBounds = null;
+  const openingRangeHigh = chart.addLineSeries({color:'rgba(157,123,255,0.30)',lineWidth:2,lineStyle:LightweightCharts.LineStyle.Dashed,title:'',priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
+  const openingRangeLow = chart.addLineSeries({color:'rgba(157,123,255,0.30)',lineWidth:2,lineStyle:LightweightCharts.LineStyle.Dashed,title:'',priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
+
+  const volumeSeries = chart.addHistogramSeries({
+    priceFormat: { type: 'volume' },
+    priceScaleId: 'volume',
+    lastValueVisible: false,
+    priceLineVisible: false,
+  });
+  chart.priceScale('volume').applyOptions({
+    scaleMargins: { top: 0.82, bottom: 0.02 },
+  });
+
+  const ma7Series = chart.addLineSeries({
+    color:'#e0ae24', lineWidth:1.5, priceLineVisible:false, lastValueVisible:false,
+  });
+  const ma25Series = chart.addLineSeries({
+    color:'#cb4daf', lineWidth:1.5, priceLineVisible:false, lastValueVisible:false,
+  });
+  const ma99Series = chart.addLineSeries({
+    color:'#8f7ac8', lineWidth:1.2, priceLineVisible:false, lastValueVisible:false,
+  });
+
+  function maData(bars, period) {
+    const out = [];
+    let sum = 0;
+    for (let i=0;i<bars.length;i++) {
+      sum += bars[i].close;
+      if (i >= period) sum -= bars[i-period].close;
+      if (i >= period-1) out.push({time:bars[i].time, value:sum/period});
+    }
+    return out;
+  }
+
+  function setState(type, message) {
+    apiState.className = 'api-state ' + (type || '');
+    apiState.querySelector('span').textContent = message;
+  }
+
+  function showError(msg) {
+    errorBox.textContent = msg;
+    errorBox.style.display = 'block';
+    setState('err','API 抓取失敗');
+  }
+
+  function hideError() {
+    errorBox.style.display = 'none';
+  }
+
+  async function fetchKlines(startMs, endMs) {
+    const params = new URLSearchParams({
+      symbol:'BTCUSDT',
+      interval:selectedInterval,
+      startTime:String(startMs),
+      endTime:String(endMs - 1),
+      limit:'1000'
+    });
+
+    const endpoints = [
+      `https://data-api.binance.vision/api/v3/klines?${params.toString()}`,
+      `https://api.binance.com/api/v3/klines?${params.toString()}`
+    ];
+
+    let lastErr = null;
+    for (const url of endpoints) {
+      try {
+        const res = await fetch(url, {cache:'no-store',signal:AbortSignal.timeout(15000)});
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (!Array.isArray(data)) throw new Error('回傳格式錯誤');
+        return data;
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+    throw lastErr || new Error('無法連線 Binance API');
+  }
+
+  function updateOpeningRangeFill() {
+    const fill = document.getElementById('openingRangeFill');
+    if (!openingRangeBounds) { fill.style.display = 'none'; return; }
+    const bounds = openingRangeBounds;
+    const highY = candleSeries.priceToCoordinate(bounds.high);
+    const lowY = candleSeries.priceToCoordinate(bounds.low);
+    const startX = chart.timeScale().timeToCoordinate(bounds.start);
+    const endX = chart.timeScale().timeToCoordinate(bounds.end);
+    if ([highY,lowY,startX,endX].some(value => value == null)) { fill.style.display = 'none'; return; }
+    const left = Math.max(0,startX);
+    const right = Math.min(chartWrap.clientWidth - 86,endX);
+    const top = Math.max(0,Math.min(highY,lowY));
+    const bottom = Math.min(chartWrap.clientHeight - 28,Math.max(highY,lowY));
+    fill.style.left = left + 'px'; fill.style.top = top + 'px';
+    fill.style.width = Math.max(0,right-left) + 'px';
+    fill.style.height = Math.max(0,bottom-top) + 'px';
+    fill.style.display = right > left && bottom > top ? 'block' : 'none';
+  }
+
+  function updateRangeOverlay() {
+    positionOptionMarks();
+    updateOpeningRangeFill();
+    positionOptionMarks();
+    if (!showRange || !currentBars.length) {
+      rangeOverlay.style.display = 'none';
+      return;
+    }
+
+    const start24Ms = currentEndMs - RANGE_HOURS * HOUR;
+    const firstTargetSec = currentBars.find(bar => bar.openTime >= start24Ms)?.time ?? Math.floor(start24Ms / 1000);
+    const markedBars = currentBars.filter(bar => bar.openTime >= start24Ms && bar.openTime < currentEndMs);
+    if (!markedBars.length) { rangeOverlay.style.display = 'none'; return; }
+    const lastBarSec = markedBars[markedBars.length - 1].time;
+    const prevBarSec = markedBars.length > 1 ? markedBars[markedBars.length - 2].time : lastBarSec - ({'15m':900,'1h':3600,'4h':14400}[selectedInterval]);
+
+    const xStartCenter = chart.timeScale().timeToCoordinate(firstTargetSec);
+    const xLastCenter = chart.timeScale().timeToCoordinate(lastBarSec);
+    const xPrevCenter = chart.timeScale().timeToCoordinate(prevBarSec);
+
+    if (xStartCenter == null || xLastCenter == null) {
+      rangeOverlay.style.display = 'none';
+      return;
+    }
+
+    let step = 8;
+    if (xPrevCenter != null) step = Math.max(2, Math.abs(xLastCenter - xPrevCenter));
+
+    const left = Math.max(0, xStartCenter - step / 2);
+    const right = Math.min(chartWrap.clientWidth, xLastCenter + step / 2);
+
+    rangeOverlay.style.left = `${left}px`;
+    rangeOverlay.style.width = `${Math.max(0,right-left)}px`;
+    rangeOverlay.style.display = right > left ? 'block' : 'none';
+  }
+
+  function updateCrosshairInfo(bar) {
+    if (!bar) return;
+    ciTime.textContent = fmtFull(bar.openTime);
+    ciOpen.textContent = fmtPrice(bar.open);
+    ciHigh.textContent = fmtPrice(bar.high);
+    ciLow.textContent = fmtPrice(bar.low);
+    ciClose.textContent = fmtPrice(bar.close);
+    ciVol.textContent = fmtVolume(bar.volume);
+
+    const change = bar.open ? ((bar.close / bar.open) - 1) * 100 : 0;
+    const amp = bar.open ? ((bar.high - bar.low) / bar.open) * 100 : 0;
+    const priceChange = bar.close - bar.open;
+    ciChange.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)}% (${priceChange >= 0 ? '+' : '-'}${fmtPrice(Math.abs(priceChange))})`;
+    ciRange.textContent = fmtPrice(bar.high - bar.low);
+    const index = currentBars.findIndex(item => item.time === bar.time);
+    const previous = index > 0 ? currentBars[index - 1] : null;
+    const signedRange = item => Math.sign(item.close - item.open) * (item.high - item.low);
+    const netRange = previous ? signedRange(previous) + signedRange(bar) : null;
+    const roundedNetRange = netRange === null ? null : Math.round(netRange * 100) / 100;
+    ciNetRange.textContent = roundedNetRange === null ? '--' : `${roundedNetRange > 0 ? '+' : roundedNetRange < 0 ? '-' : ''}${fmtPrice(Math.abs(roundedNetRange))}`;
+    ciNetRangeWrap.classList.toggle('rise', roundedNetRange !== null && roundedNetRange > 0);
+    ciNetRangeWrap.classList.toggle('fall', roundedNetRange !== null && roundedNetRange < 0);
+    ciAmp.textContent = `${amp.toFixed(2)}%`;
+    ciChangeWrap.classList.toggle('rise', change >= 0);
+    ciChangeWrap.classList.toggle('fall', change < 0);
+  }
+
+  function updateHighLowMarkers(bars) {
+    if (!bars.length) {
+      candleSeries.setMarkers([]);
+      return;
+    }
+    let highBar = bars[0];
+    let lowBar = bars[0];
+    for (const b of bars) {
+      if (b.high > highBar.high) highBar = b;
+      if (b.low < lowBar.low) lowBar = b;
+    }
+    const markers = [
+      {
+        time: highBar.time,
+        position: 'aboveBar',
+        color: '#f4ce3a',
+        shape: 'arrowDown',
+        text: `高 ${fmtPrice(highBar.high)}`
+      },
+      {
+        time: lowBar.time,
+        position: 'belowBar',
+        color: '#d7dde4',
+        shape: 'arrowUp',
+        text: `低 ${fmtPrice(lowBar.low)}`
+      }
+    ].sort((a,b) => Number(a.time) - Number(b.time));
+    candleSeries.setMarkers(markers);
+  }
+
+  function nearestOption(boundary, expiry, contracts) {
+    return contracts.filter(s => Number(s.expiryDate) === expiry && s.side === boundary.side && Number.isFinite(Number(s.strikePrice))).sort((a,b) => Math.abs(Number(a.strikePrice)-boundary.price)-Math.abs(Number(b.strikePrice)-boundary.price) || Number(a.strikePrice)-Number(b.strikePrice))[0];
+  }
+  function positionOptionMarks() {
+    optionBoundaries.forEach((boundary,index) => {
+      const el=document.getElementById('optionMark'+index);
+      const entry=optionValues.get(index), y=candleSeries.priceToCoordinate(boundary.price);
+      const contract=nearestOption(boundary,currentEndMs,optionContracts);
+      const matches=entry && contract && entry.symbol===contract.symbol && entry.expiry===currentEndMs;
+      el.hidden=!liveMode || y==null || y<0 || y>chartWrap.clientHeight-28;
+      el.textContent=matches ? fmtPrice(entry.price) : '--';
+      el.style.color=index<2?'#f4ce3a':'#4dabf7';
+      el.style.left=Math.max(14,chartWrap.clientWidth-240)+'px';
+      el.style.top=(boundary.side==='CALL'?Math.max(0,y-30):y+6)+'px';
+    });
+    for(let index=optionBoundaries.length;index<4;index++)document.getElementById('optionMark'+index).hidden=true;
+  }
+  async function refreshOptionMarks() {
+    if(!liveMode || optionBusy || document.hidden)return;
+    optionBusy=true;const epoch=optionEpoch;
+    try {
+      const base='http://127.0.0.1:5084/api/options/';
+      if(Date.now()-optionContractFetched>300000){
+        const response=await fetch(base+'contracts',{signal:AbortSignal.timeout(12000)});
+        const data=await response.json();if(!response.ok)throw Error(data.error);
+        if(epoch!==optionEpoch || !liveMode)return;
+        optionContracts=data.items;optionContractFetched=Date.now();
+      }
+      const response=await fetch(base+'marks',{signal:AbortSignal.timeout(12000)});
+      const data=await response.json();if(!response.ok)throw Error(data.error);
+      if(epoch!==optionEpoch || !liveMode)return;
+      const marks=new Map(data.items.map(s=>[s.symbol,s.markPrice]));
+      optionValues.clear();
+      optionBoundaries.forEach((boundary,index)=>{
+        const contract=nearestOption(boundary,currentEndMs,optionContracts);
+        const raw=contract ? marks.get(contract.symbol) : undefined;
+        if(raw!=null && raw!=='' && Number.isFinite(Number(raw)))optionValues.set(index,{symbol:contract.symbol,expiry:currentEndMs,price:Number(raw)});
+      });
+    }catch(error){optionValues.clear();}
+    finally{optionBusy=false;positionOptionMarks();}
+  }
+  setInterval(refreshOptionMarks,1000);
+  for(const event of ['pointermove','pointerup','wheel'])chartWrap.addEventListener(event,()=>requestAnimationFrame(positionOptionMarks),{passive:true});
+  chart.timeScale().subscribeVisibleLogicalRangeChange(positionOptionMarks);
+
+  function updateIdealRange(firstBar) {
+    for (const line of idealRangeLines) candleSeries.removePriceLine(line);
+    idealRangeLines = [];
+    optionBoundaries = [];
+    if (!firstBar || !Number.isFinite(firstBar.open)) { positionOptionMarks(); return; }
+    idealRangeLines = [
+      {price:firstBar.open + 2000, title:'理想範圍 上限 +2,000'},
+      {price:firstBar.open - 2000, title:'理想範圍 下限 −2,000'},
+      {price:firstBar.open + 1000, title:'現實範圍 上限 +1,000', color:'rgba(77,171,247,0.30)', labelColor:'#294b66'},
+      {price:firstBar.open - 1000, title:'現實範圍 下限 −1,000', color:'rgba(77,171,247,0.30)', labelColor:'#294b66'}
+    ].map((boundary,index) => { optionBoundaries.push({...boundary,side:index % 2 === 0 ? "CALL" : "PUT"}); return candleSeries.createPriceLine({
+      price:boundary.price,
+      title:boundary.title,
+      color:boundary.color || 'rgba(244,206,58,0.30)',
+      lineWidth:2,
+      lineStyle:LightweightCharts.LineStyle.Dashed,
+      lineVisible:true,
+      axisLabelVisible:true,
+      axisLabelColor:boundary.labelColor || '#665b2c',
+      axisLabelTextColor:'#ffffff'
+    }); });
+    positionOptionMarks();
+  }
+  function updateOpeningRange(bars) {
+    const ordered = [...bars].sort((a,b) => a.time - b.time);
+    const first = ordered.find(bar => Number.isFinite(bar.high) && Number.isFinite(bar.low) && bar.high - bar.low >= 200);
+    if (!first) {
+      openingRangeBounds = null;
+      updateOpeningRangeFill();
+      openingRangeHigh.setData([]);
+      openingRangeLow.setData([]);
+      document.getElementById('openingRangeInfo').textContent = bars.length ? '24h 內沒有高低差至少 200 點的 K 線' : '--';
+      return;
+    }
+    const step = {'15m':900,'1h':3600,'4h':14400}[selectedInterval];
+    const endTime = Math.max(first.time + step, ordered[ordered.length - 1].time);
+    openingRangeBounds = {start:first.time,end:endTime,high:first.high,low:first.low};
+    requestAnimationFrame(updateOpeningRangeFill);
+    openingRangeHigh.setData([{time:first.time,value:first.high},{time:endTime,value:first.high}]);
+    openingRangeLow.setData([{time:first.time,value:first.low},{time:endTime,value:first.low}]);
+    document.getElementById('openingRangeInfo').textContent = '基準 ' + fmtFull(first.openTime) + ' ｜高 ' + fmtPrice(first.high) + ' ｜低 ' + fmtPrice(first.low) + ' ｜高低差 ' + fmtPrice(first.high-first.low);
+  }
+
+  function updateRangeStats(bars) {
+    const start = currentEndMs - RANGE_HOURS * HOUR;
+    const selected = bars.filter(bar => bar.openTime >= start && bar.openTime < currentEndMs);
+    updateIdealRange(selected[0]);
+    updateOpeningRange(selected);
+    document.getElementById('rangeStatsPeriod').textContent = `${fmtFull(start)} → ${fmtFull(currentEndMs)}（台灣時間）`;
+    const values = {Open:'--',OpenCompare:'--',Close:'--',High:'--',Low:'--',Diff:'--',Amp:'--'};
+    if (selected.length) {
+      const open = selected[0].open;
+      const close = selected[selected.length - 1].close;
+      const high = Math.max(...selected.map(bar => bar.high));
+      const low = Math.min(...selected.map(bar => bar.low));
+      values.Open = fmtPrice(open);
+      const highDistance = Math.round(Math.abs(high - open) * 100) / 100;
+      const lowDistance = Math.round(Math.abs(low - open) * 100) / 100;
+      values.OpenCompare = highDistance === lowDistance
+        ? `距最高、最低相同：${fmtPrice(highDistance)}`
+        : `距${highDistance > lowDistance ? '最高' : '最低'}價較大：${fmtPrice(Math.max(highDistance, lowDistance))}`;
+      values.Close = fmtPrice(close);
+      values.High = fmtPrice(high);
+      values.Low = fmtPrice(low);
+      values.Diff = fmtPrice(high - low);
+      values.Amp = open ? `${((high - low) / open * 100).toFixed(2)}%` : '--';
+    }
+    for (const [key, value] of Object.entries(values)) document.getElementById(`rangeStats${key}`).textContent = value;
+  }
+  function updateSummary(bars) {
+    updateRangeStats(bars);
+    if (!bars.length) return;
+    const last = bars[bars.length-1];
+    const first = bars[0];
+    const prev24Start = currentEndMs - RANGE_HOURS * HOUR;
+    const last24 = bars.filter(b => b.openTime >= prev24Start && b.openTime < currentEndMs);
+    const high24 = Math.max(...last24.map(b=>b.high));
+    const low24 = Math.min(...last24.map(b=>b.low));
+    const vol24 = last24.reduce((s,b)=>s+b.volume,0);
+
+    const pct = first.close ? ((last.close / first.close) - 1) * 100 : 0;
+    lastPriceEl.textContent = fmtPrice(last.close);
+    lastTimeEl.textContent = `台灣時間 ${fmtFull(last.openTime)}`;
+    changePctEl.textContent = `${pct>=0?'+':''}${pct.toFixed(2)}%`;
+    lastPriceEl.classList.toggle('down', pct < 0);
+    changePctEl.classList.toggle('down', pct < 0);
+
+    high24El.textContent = fmtPrice(high24);
+    low24El.textContent = fmtPrice(low24);
+    vol24El.textContent = fmtVolume(vol24);
+
+    const d7 = maData(bars,7);
+    const d25 = maData(bars,25);
+    const d99 = maData(bars,99);
+    ma7El.textContent = `MA(7): ${d7.length ? fmtPrice(d7[d7.length-1].value) : '--'}`;
+    ma25El.textContent = `MA(25): ${d25.length ? fmtPrice(d25[d25.length-1].value) : '--'}`;
+    ma99El.textContent = `MA(99): ${d99.length ? fmtPrice(d99[d99.length-1].value) : '--'}`;
+  }
+
+  function setData(bars) {
+    const candles = bars.map(b => ({
+      time:b.time, open:b.open, high:b.high, low:b.low, close:b.close
+    }));
+    const volumes = bars.map(b => ({
+      time:b.time,
+      value:b.volume,
+      color:b.close >= b.open ? 'rgba(41,195,154,.44)' : 'rgba(246,78,102,.44)'
+    }));
+
+    candleSeries.setData(candles);
+    volumeSeries.setData(volumes);
+    ma7Series.setData(maData(bars,7));
+    ma25Series.setData(maData(bars,25));
+    ma99Series.setData(maData(bars,99));
+    updateHighLowMarkers(bars);
+    updateCrosshairInfo(bars[bars.length - 1]);
+
+    chart.timeScale().fitContent();
+    requestAnimationFrame(updateRangeOverlay);
+  }
+
+  async function loadSelectedDate(background = false) {
+    if (background && loadingData) return;
+    if (!background) updateRangeStats([]);
+    const requestVersion = ++loadVersion;
+    loading.querySelector('span').textContent = '抓取 BTC ' + selectedInterval.toUpperCase() + ' K 線…';
+    const dateStr = dateInput.value;
+    if (!dateStr && !liveMode) return;
+    loadingData = true;
+    const savedRange = background ? chart.timeScale().getVisibleLogicalRange() : null;
+
+    hideError();
+    if (!background) loading.style.display = 'flex';
+    setState('','連線 Binance API…');
+
+    const end = liveMode ? new Date() : taipei16(dateStr);
+    const endMs = end.getTime();
+    const contractDate = liveMode ? liveContractDate(endMs) : dateStr;
+    currentEndMs = taipei16(contractDate).getTime();
+    const startMs = currentEndMs - TOTAL_HOURS * HOUR;
+    if (!background) updateRangeStats([]);
+    document.querySelector(".window .tail").textContent = liveMode ? contractDate + " 契約 · 即時" : "固定 16:00";
+
+    startLabel.textContent = fmtMDHM(startMs);
+    endLabel.textContent = fmtMDHM(endMs);
+
+    try {
+      const raw = await fetchKlines(startMs, endMs);
+      if (requestVersion !== loadVersion) return;
+      const bars = raw.map(k => ({
+        openTime:Number(k[0]),
+        time:Math.floor(Number(k[0])/1000),
+        open:Number(k[1]),
+        high:Number(k[2]),
+        low:Number(k[3]),
+        close:Number(k[4]),
+        volume:Number(k[5]),
+      })).filter(b => Number.isFinite(b.close));
+
+      currentBars = bars;
+      if (!bars.length) throw new Error('這個日期區間沒有取得 K 線資料');
+
+      setData(bars);
+      if (savedRange) chart.timeScale().setVisibleLogicalRange(savedRange);
+      updateSummary(bars);
+      if(liveMode)refreshOptionMarks();
+      barCount.textContent = `${bars.length} 根 K`;
+      setState('ok','Binance API · BTCUSDT' + (liveMode ? ' · 即時' : ''));
+      if (liveMode) document.getElementById('liveStatus').textContent = '契約日 ' + contractDate + ' · 每 1 秒更新 · 更新於 ' + fmtFull(Date.now()) + ' · 末根尚未收盤';
+    } catch (err) {
+      if (requestVersion !== loadVersion) return;
+      if (background && currentBars.length) {
+        setState('err','即時更新失敗，保留上次資料');
+        document.getElementById('liveStatus').textContent = '更新失敗，顯示上次行情；1 秒後重試';
+        return;
+      }
+      currentBars = [];
+      candleSeries.setData([]);
+      volumeSeries.setData([]);
+      ma7Series.setData([]);
+      ma25Series.setData([]);
+      ma99Series.setData([]);
+      candleSeries.setMarkers([]);
+      rangeOverlay.style.display = 'none';
+      barCount.textContent = '0 根 K';
+      showError(`無法取得資料：${err?.message || err}。若你的網路限制 Binance，可換網路或把 API 位址改成可連線的代理。`);
+    } finally {
+      if (requestVersion === loadVersion) { loading.style.display = 'none'; loadingData = false; }
+    }
+  }
+
+  document.querySelectorAll('.periods [data-interval]').forEach(button => {
+    const select = () => {
+      if (selectedInterval === button.dataset.interval) return;
+      selectedInterval = button.dataset.interval;
+      document.getElementById('dataPeriod').textContent = button.textContent;
+      document.querySelectorAll('.periods [data-interval]').forEach(item => item.classList.toggle('active', item === button));
+      document.querySelector('.tf-pill').textContent = selectedInterval.toUpperCase();
+      loadSelectedDate();
+    };
+    button.addEventListener('click', select);
+    button.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); select(); }
+    });
+  });
+  document.getElementById('liveBtn').addEventListener('click', () => {
+    liveMode = !liveMode;
+    optionEpoch++;optionValues.clear();positionOptionMarks();
+    document.getElementById('liveBtn').textContent = liveMode ? '返回歷史模式' : '即時行情';
+    document.getElementById('liveBtn').setAttribute('aria-pressed', String(liveMode));
+    document.getElementById('liveRefreshBtn').hidden = !liveMode;
+    document.getElementById('liveStatus').hidden = !liveMode;
+    for (const element of [dateInput, calendarDate, dateMode, prevDay, nextDay]) element.disabled = liveMode;
+    clearInterval(liveTimer);
+    if (liveMode) liveTimer = setInterval(() => { if (!document.hidden) loadSelectedDate(true); },1000);
+    else updateDateNavigation();
+    loadSelectedDate();
+  });
+  document.getElementById('liveRefreshBtn').addEventListener('click', () => loadSelectedDate(true));
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && liveMode) loadSelectedDate(true); });
+
+  rangeBtn.addEventListener('click', () => {
+    showRange = !showRange;
+    rangeBtn.classList.toggle('off', !showRange);
+    rangeBtn.textContent = showRange ? '24H 標記' : '24H 關閉';
+    updateRangeOverlay();
+  });
+
+  function acceptsDate(date) {
+    const day = new Date(date + 'T00:00:00Z').getUTCDay();
+    return dateMode.value === 'all' || (dateMode.value === 'monday' ? day === 1 : dateMode.value === 'weekdays' ? day >= 1 && day <= 5 : day === 0 || day === 6);
+  }
+  function rebuildDates(preferred = dateInput.value || taiwanToday()) {
+    const fragment = document.createDocumentFragment();
+    const labels = ['日','一','二','三','四','五','六'];
+    let nearest = '';
+    for (let date = taiwanToday(); date >= '2010-01-01'; date = shiftDate(date, -1)) {
+      if (!acceptsDate(date)) continue;
+      const option = document.createElement('option');
+      option.value = date;
+      option.textContent = date + ' 星期' + labels[new Date(date + 'T00:00:00Z').getUTCDay()];
+      fragment.appendChild(option);
+      if (!nearest && date <= preferred) nearest = date;
+    }
+    dateInput.replaceChildren(fragment);
+    dateInput.value = nearest || dateInput.options[0]?.value || '';
+    dateInput.hidden = dateMode.value === 'all';
+    calendarDate.hidden = dateMode.value !== 'all';
+    calendarDate.min = '2010-01-01';
+    calendarDate.max = taiwanToday();
+    updateDateNavigation();
+  }
+  function updateDateNavigation() {
+    calendarDate.value = dateInput.value;
+    prevDay.disabled = dateInput.selectedIndex < 0 || dateInput.selectedIndex >= dateInput.options.length - 1;
+    nextDay.disabled = dateInput.selectedIndex <= 0;
+    prevDay.setAttribute('aria-label','上一個列表日期');
+    nextDay.setAttribute('aria-label','下一個列表日期');
+  }
+  prevDay.addEventListener('click', () => {
+    if (dateInput.selectedIndex < dateInput.options.length - 1) {
+      dateInput.selectedIndex++; updateDateNavigation(); loadSelectedDate();
+    }
+  });
+  nextDay.addEventListener('click', () => {
+    if (dateInput.selectedIndex > 0) {
+      dateInput.selectedIndex--; updateDateNavigation(); loadSelectedDate();
+    }
+  });
+  dateInput.addEventListener('change', () => { updateDateNavigation(); loadSelectedDate(); });
+  calendarDate.addEventListener('change', () => {
+    if (!calendarDate.value || calendarDate.value < calendarDate.min || calendarDate.value > calendarDate.max) {
+      calendarDate.value = dateInput.value; return;
+    }
+    dateInput.value = calendarDate.value;
+    updateDateNavigation();
+    loadSelectedDate();
+  });
+  dateMode.addEventListener('change', () => {
+    const previous = dateInput.value;
+    rebuildDates(previous);
+    try { localStorage.setItem('btc-usd-date-mode', dateMode.value); } catch {}
+    if (dateInput.value !== previous) loadSelectedDate();
+  });
+  chart.subscribeCrosshairMove(param => {
+    if (!currentBars.length) return;
+    if (!param || !param.time || !param.point || param.point.x < 0 || param.point.y < 0) {
+      updateCrosshairInfo(currentBars[currentBars.length - 1]);
+      return;
+    }
+    const t = Number(param.time);
+    const bar = currentBars.find(b => b.time === t);
+    if (bar) updateCrosshairInfo(bar);
+  });
+
+  chart.timeScale().subscribeVisibleTimeRangeChange(updateRangeOverlay);
+  chart.timeScale().subscribeVisibleLogicalRangeChange(updateOpeningRangeFill);
+  for (const eventName of ['pointermove','pointerup','wheel']) chartWrap.addEventListener(eventName, () => requestAnimationFrame(updateOpeningRangeFill), {passive:true});
+
+  new ResizeObserver(() => {
+    chart.applyOptions({width:chartWrap.clientWidth, height:chartWrap.clientHeight});
+    requestAnimationFrame(updateRangeOverlay);
+  }).observe(chartWrap);
+
+  try {
+    const savedMode = localStorage.getItem('btc-usd-date-mode');
+    if (['all','monday','weekdays','weekend'].includes(savedMode)) dateMode.value = savedMode;
+  } catch {}
+  rebuildDates(taiwanToday());
+  loadSelectedDate();
+})();
+</script>
+</body>
+</html>

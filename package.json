@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "convert": "node 資料轉換工具/convert.js",
-    "watch-data": "node 資料轉換工具/convert.js --watch"
+    "watch-data": "node 資料轉換工具/convert.js --watch",
+    "start:btc-live": "node btc-live/btc-options-live-server.cjs"
   },
   "engines": {
     "node": ">=20.3"
