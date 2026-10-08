@@ -901,6 +901,9 @@
   let optionBoundaries = [];
   let optionContracts = [], optionContractFetched = 0, optionBusy = false, optionEpoch = 0;
   const optionValues = new Map();
+  const onlineOptions = location.hostname.endsWith('.github.io');
+  let optionSocket = null, optionRetryAt = 0, optionRetryDelay = 1000, optionLastMessage = 0;
+  const onlineOptionMarks = new Map();
   let openingRangeBounds = null;
   const openingRangeHigh = chart.addLineSeries({color:'rgba(157,123,255,0.30)',lineWidth:2,lineStyle:LightweightCharts.LineStyle.Dashed,title:'',priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
   const openingRangeLow = chart.addLineSeries({color:'rgba(157,123,255,0.30)',lineWidth:2,lineStyle:LightweightCharts.LineStyle.Dashed,title:'',priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
@@ -1109,8 +1112,59 @@
     });
     for(let index=optionBoundaries.length;index<4;index++)document.getElementById('optionMark'+index).hidden=true;
   }
+  function stopOnlineOptions() {
+    const socket = optionSocket; optionSocket = null;
+    if (socket) { socket.onclose = null; socket.close(); }
+    onlineOptionMarks.clear(); optionValues.clear(); optionLastMessage = 0;
+  }
+  function applyOnlineOptionMarks() {
+    optionValues.clear();
+    if (!liveMode || Date.now() - optionLastMessage > 10000) { positionOptionMarks(); return; }
+    optionBoundaries.forEach((boundary,index) => {
+      const contract = nearestOption(boundary,currentEndMs,optionContracts);
+      const price = contract ? onlineOptionMarks.get(contract.symbol) : undefined;
+      if (Number.isFinite(price)) optionValues.set(index,{symbol:contract.symbol,expiry:currentEndMs,price});
+    });
+    positionOptionMarks();
+  }
+  function refreshOnlineOptions() {
+    if (optionSocket && Date.now() - optionLastMessage > 15000) stopOnlineOptions();
+    applyOnlineOptionMarks();
+    if (optionSocket || Date.now() < optionRetryAt) return;
+    const socket = new WebSocket('wss://fstream.binance.com/market/ws/btcusdt@optionMarkPrice');
+    optionSocket = socket; optionLastMessage = Date.now();
+    socket.onmessage = event => {
+      if (socket !== optionSocket || !liveMode) return;
+      try {
+        const payload = JSON.parse(event.data), rows = payload.data || payload;
+        if (!Array.isArray(rows)) return;
+        const contracts = [], marks = new Map();
+        for (const row of rows) {
+          const match = String(row.s).match(/^BTC-(\d{2})(\d{2})(\d{2})-(\d+(?:\.\d+)?)-([CP])$/);
+          if (!match || row.mp == null || row.mp === '' || !Number.isFinite(Number(row.mp))) continue;
+          const expiryDate = Date.parse('20'+match[1]+'-'+match[2]+'-'+match[3]+'T16:00:00+08:00');
+          if (!Number.isFinite(expiryDate) || expiryDate <= Date.now()) continue;
+          contracts.push({symbol:row.s,expiryDate,strikePrice:Number(match[4]),side:match[5]==='C'?'CALL':'PUT'});
+          marks.set(row.s,Number(row.mp));
+        }
+        optionContracts = contracts;
+        onlineOptionMarks.clear();for(const [symbol,price] of marks) onlineOptionMarks.set(symbol,price);
+        optionLastMessage = Date.now(); optionRetryDelay = 1000;
+        applyOnlineOptionMarks();
+      } catch { /* Ignore malformed packets without using other price fields. */ }
+    };
+    socket.onerror = () => socket.close();
+    socket.onclose = () => {
+      if (socket !== optionSocket) return;
+      optionSocket = null; onlineOptionMarks.clear(); optionValues.clear(); positionOptionMarks();
+      optionRetryAt = Date.now() + optionRetryDelay;
+      optionRetryDelay = Math.min(30000,optionRetryDelay*2);
+    };
+  }
+
   async function refreshOptionMarks() {
     if(!liveMode || optionBusy || document.hidden)return;
+    if(onlineOptions){ refreshOnlineOptions(); return; }
     optionBusy=true;const epoch=optionEpoch;
     try {
       const base='http://127.0.0.1:5084/api/options/';
@@ -1344,7 +1398,9 @@
   });
   document.getElementById('liveBtn').addEventListener('click', () => {
     liveMode = !liveMode;
-    optionEpoch++;optionValues.clear();positionOptionMarks();
+    optionEpoch++;optionValues.clear();
+    if(onlineOptions){stopOnlineOptions();optionRetryAt=0;optionRetryDelay=1000;}
+    positionOptionMarks();
     document.getElementById('liveBtn').textContent = liveMode ? '返回歷史模式' : '即時行情';
     document.getElementById('liveBtn').setAttribute('aria-pressed', String(liveMode));
     document.getElementById('liveRefreshBtn').hidden = !liveMode;
