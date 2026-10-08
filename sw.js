@@ -1,5 +1,5 @@
 'use strict';
-const VERSION = 'btc-options-pwa-v4-btc-ranges';
+const VERSION = 'btc-options-pwa-v5-mobile-chart';
 const SHELL = VERSION + '-shell';
 const DATA = VERSION + '-data';
 const BASE = new URL('./', self.location.href);

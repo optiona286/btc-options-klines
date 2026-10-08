@@ -532,6 +532,64 @@
     .comparison-on .cross-info { margin: 0; border-radius: 0; flex-shrink: 0; }
     @media(max-width: 980px) { .comparison-on { min-height: 640px; } }
   </style>
+
+  <style id="mobile-chart-redesign">
+    .mobile-chart-bar { display:none; }
+    @media (max-width:760px), (max-width:980px) and (pointer:coarse) {
+      body.mobile-chart-view .topbar { flex-wrap:nowrap; padding:6px 10px; min-height:42px; gap:6px; }
+      body.mobile-chart-view .brand { min-width:0; flex:1; }
+      body.mobile-chart-view .brand h1 { font-size:12px; gap:5px; white-space:nowrap; }
+      body.mobile-chart-view .brand .mark { width:23px; height:23px; font-size:14px; }
+      body.mobile-chart-view .version { display:none; }
+      body.mobile-chart-view .top-actions { width:auto; flex-wrap:nowrap; }
+      body.mobile-chart-view .top-actions .status { display:none; }
+      body.mobile-chart-view #autoRefresh { font-size:10px; min-height:30px; padding:4px 6px; }
+      body.mobile-chart-view #installApp { display:none; }
+      .layout[data-mobile-view="chart"] main,
+      .layout[data-mobile-view="chart"] main.comparison-layout { display:flex; flex-direction:column; height:auto; min-height:100%; }
+      .layout[data-mobile-view="chart"] .instrument { flex:0 0 auto; padding:10px 12px 8px; border-bottom:0; align-items:center; gap:10px; }
+      .layout[data-mobile-view="chart"] .instrument > div:first-child { flex:1; min-width:0; }
+      .layout[data-mobile-view="chart"] .instrument h2 { font-size:16px; margin:0; line-height:1.4; }
+      .layout[data-mobile-view="chart"] .chart-kind { border:0; padding:0; margin:0 0 3px; font-size:10px; }
+      .layout[data-mobile-view="chart"] .last-price { text-align:right; max-width:45%; }
+      .layout[data-mobile-view="chart"] .last-price strong { font-size:26px; line-height:1.2; }
+      .layout[data-mobile-view="chart"] .change { font-size:10px; max-width:none; line-height:1.4; }
+      .layout[data-mobile-view="chart"] .instrument .meta,
+      .layout[data-mobile-view="chart"] .source-info,
+      .layout[data-mobile-view="chart"] .final-session { display:none; }
+      .layout[data-mobile-view="chart"] main.mobile-details-open .instrument .meta,
+      .layout[data-mobile-view="chart"] main.mobile-details-open .source-info,
+      .layout[data-mobile-view="chart"] main.mobile-details-open .final-session:not([hidden]) { display:block; font-size:10px; line-height:1.5; }
+      .layout[data-mobile-view="chart"] .cards.cross-info { display:flex; flex-wrap:nowrap; overflow-x:auto; margin:0; border:0; border-radius:0; background:transparent; scrollbar-width:none; flex:0 0 auto; }
+      .layout[data-mobile-view="chart"] .cross-info::-webkit-scrollbar { display:none; }
+      .layout[data-mobile-view="chart"] .cross-info .card,
+      .layout[data-mobile-view="chart"] .cross-info .card:first-child { display:block; flex:0 0 auto; min-width:65px; padding:5px 9px; border:0; text-align:left; }
+      .layout[data-mobile-view="chart"] .cross-info .card:first-child { min-width:126px; }
+      .layout[data-mobile-view="chart"] .cross-info .card span { display:block; font-size:10px !important; margin:0 0 2px; }
+      .layout[data-mobile-view="chart"] .cross-info .card b { font-size:12px !important; line-height:1.4; }
+      .layout[data-mobile-view="chart"] .chart-wrap { flex:1 0 auto; margin:0; border:0; border-radius:0; min-height:max(420px,calc(100dvh - 200px)); }
+      .layout[data-mobile-view="chart"] .chart-stage { flex:1; min-height:320px; }
+      .layout[data-mobile-view="chart"] .mobile-chart-bar { display:flex; align-items:center; flex:0 0 auto; gap:4px; min-height:40px; padding:0 8px; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+      .mobile-periods { display:flex; flex:1; min-width:0; gap:2px; overflow-x:auto; scrollbar-width:none; }
+      .mobile-periods button,.mobile-chart-bar > button { background:transparent; color:var(--muted); border:0; border-radius:0; padding:8px 9px; font:inherit; font-size:12px; min-height:40px; white-space:nowrap; }
+      .mobile-periods button[aria-pressed="true"] { color:var(--text); box-shadow:inset 0 -2px var(--amber); }
+      .mobile-chart-bar > button[aria-expanded="true"] { color:var(--cyan); }
+      .layout[data-mobile-view="chart"] .chart-tools { display:none; }
+      .layout[data-mobile-view="chart"] .chart-wrap.mobile-tools-open .chart-tools { display:flex; position:absolute; top:40px; left:0; right:0; z-index:10; flex-wrap:wrap; max-height:45dvh; overflow:auto; padding:10px; background:var(--panel); border-bottom:1px solid var(--line2); box-shadow:0 8px 18px #0006; }
+      .layout[data-mobile-view="chart"] .chart-tools .toggle { min-height:36px; padding:5px 9px; font-size:12px; }
+      .layout[data-mobile-view="chart"] .chart-footer { flex:0 0 auto; min-height:32px; padding:3px 8px; flex-wrap:nowrap; gap:8px; }
+      .layout[data-mobile-view="chart"] .touch-modes { gap:4px; }
+      .layout[data-mobile-view="chart"] .touch-modes button { min-height:28px; padding:3px 8px; font-size:10px; }
+      .layout[data-mobile-view="chart"] #gestureHelp { display:none; }
+      .layout[data-mobile-view="chart"] #viewRange { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:9px; }
+      .layout[data-mobile-view="chart"] .comparison-on { min-height:max(680px,calc(100dvh - 200px)); }
+      .layout[data-mobile-view="chart"] .comparison-stage { min-height:250px; }
+      .layout[data-mobile-view="chart"] .comparison-info { white-space:nowrap; overflow-x:auto; font-size:10px; padding:3px 8px; min-height:24px; }
+      .layout[data-mobile-view="chart"] .comparison-heading { padding:4px 8px; font-size:10px; }
+      .layout[data-mobile-view="chart"] .comparison-heading span { margin-left:6px; font-size:9px; }
+    }
+  </style>
+
 </head>
 <body>
   <header class="topbar">
@@ -628,7 +686,12 @@
         <div class="card"><span>K 棒數</span><b id="barsValue">--</b></div>
       </section>
       <section class="chart-wrap" id="chartWrap">
-        <div class="chart-tools">
+        <div class="mobile-chart-bar">
+          <div id="mobilePeriods" class="mobile-periods" role="group" aria-label="K 線週期"></div>
+          <button id="mobileDetailsToggle" aria-expanded="false" aria-controls="symbolMeta sourceInfo finalSessionInfo finalSixHoursInfo">資訊</button>
+          <button id="mobileToolsToggle" aria-expanded="false" aria-controls="chartTools">更多 ▾</button>
+        </div>
+        <div class="chart-tools" id="chartTools">
           <button id="compareToggle" class="toggle" aria-pressed="false">上下對比</button>
           <button class="toggle active" data-indicator="ma7">MA7</button>
           <button class="toggle active" data-indicator="ma20">MA20</button>
@@ -711,7 +774,24 @@
       }
     } catch { /* Storage can be unavailable in a private browser session. */ }
 
+    function renderMobilePeriods() {
+      const container = document.getElementById("mobilePeriods");
+      if (!container) return;
+      container.replaceChildren(...state.periods.map(period => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = { "1m":"1分", "15m":"15分", "1h":"1小時", "4h":"4小時" }[period] || period;
+        button.setAttribute("aria-pressed", String(period === state.period));
+        button.addEventListener("click", () => {
+          document.getElementById("periodSelect").value = period;
+          document.getElementById("periodSelect").dispatchEvent(new Event("change"));
+        });
+        return button;
+      }));
+    }
+
     function saveSettings() {
+      renderMobilePeriods();
       const { file, period, selected, expiry, mode, favorites, autoRefresh, indicators, view, compare } = state;
       try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ file, period, selected, expiry, mode, favorites, autoRefresh, indicators, view, compare, datasetMode:state.datasetMode })); } catch {}
     }
@@ -735,6 +815,7 @@
     const mobileLayout = window.matchMedia("(max-width: 760px), (max-width: 980px) and (pointer: coarse)");
     function setMobileView(view) {
       document.querySelector(".layout").dataset.mobileView = view;
+      document.body.classList.toggle("mobile-chart-view", view === "chart");
       $("mobileChain").setAttribute("aria-pressed", String(view === "chain"));
       $("mobileChart").setAttribute("aria-pressed", String(view === "chart"));
       $("mobileFilter").setAttribute("aria-pressed", String(view === "filter"));
@@ -752,6 +833,16 @@
       $("touchPan").setAttribute("aria-pressed", String(mode === "pan"));
       updateMobileHelp();
     }
+    $("mobileToolsToggle").addEventListener("click", () => {
+      const open = ui.wrap.classList.toggle("mobile-tools-open");
+      $("mobileToolsToggle").setAttribute("aria-expanded", String(open));
+      $("mobileToolsToggle").textContent = open ? "收起 ▴" : "更多 ▾";
+    });
+    $("mobileDetailsToggle").addEventListener("click", () => {
+      const open = ui.wrap.parentElement.classList.toggle("mobile-details-open");
+      $("mobileDetailsToggle").setAttribute("aria-expanded", String(open));
+      resizeAndDraw();
+    });
     $("touchCrosshair").addEventListener("click", () => setTouchMode("crosshair"));
     $("touchPan").addEventListener("click", () => setTouchMode("pan"));
     $("mobileChain").addEventListener("click", () => setMobileView("chain"));
@@ -1050,7 +1141,7 @@
         context.setLineDash([6, 4]);
         context.beginPath(); context.moveTo(left, py); context.lineTo(left + width, py); context.stroke();
         context.setLineDash([]);
-        const label = boundary.title + " · " + fmt(boundary.price, 2);
+        const label = (mobileLayout.matches ? boundary.title.replace("理想範圍", "理想").replace("現實範圍", "現實").replace(" 上限 ", " ").replace(" 下限 ", " ") : boundary.title) + " · " + fmt(boundary.price, 2);
         const labelY = py < top + 16 ? py + 14 : py - 5;
         context.fillStyle = "rgba(17,24,35,.85)";
         context.fillRect(left + 4, labelY - 11, context.measureText(label).width + 8, 15);
@@ -1309,7 +1400,7 @@
       const right = 72;
       const top = 18;
       const bottom = 27;
-      const volumeHeight = state.indicators.volume ? Math.min(105, h * .2) : 0;
+      const volumeHeight = state.indicators.volume ? Math.min(mobileLayout.matches ? 70 : 105, h * (mobileLayout.matches ? .14 : .2)) : 0;
       const priceBottom = h - bottom - volumeHeight;
       state.visible = Math.min(state.visible, state.rows.length);
       state.start = Math.max(0, Math.min(state.start, state.rows.length - state.visible));
@@ -1589,6 +1680,7 @@
     });
     ui.period.addEventListener("change", async () => {
       state.period = ui.period.value;
+      renderMobilePeriods();
       if (state.selected) await selectSymbol(state.selected, { view: state.view });
     });
     ui.expiry.addEventListener("change", () => {
