@@ -604,7 +604,14 @@
     .option-mark{font-size:14px;}
   }
 </style>
-</head>
+<style>
+#optionChainTab{border:0;background:transparent;color:var(--muted);padding:0;font:inherit;position:relative;}#optionChainTab.active{color:var(--text);font-weight:700;}#optionChainTab[hidden],#optionChainPanel[hidden]{display:none;}
+#priceTab{cursor:pointer;position:relative;}#optionChainPanel{grid-area:chart;z-index:8;min-width:0;min-height:0;background:var(--bg);display:flex;flex-direction:column;border-top:1px solid var(--line);}
+.option-chain-head{display:flex;align-items:center;gap:12px;padding:14px 18px;flex-wrap:wrap;}.option-chain-head h2{font-size:18px;margin:0;}.option-chain-head select{padding:8px;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:6px;font:inherit;}.option-chain-head small{color:var(--muted);margin-left:auto;}
+.option-chain-scroll{flex:1;min-height:0;overflow:auto;}.option-chain-table{border-collapse:collapse;width:100%;font-size:15px;font-variant-numeric:tabular-nums;}.option-chain-table th{position:sticky;top:0;background:var(--panel);z-index:1;padding:12px;}.option-chain-table td{text-align:center;padding:11px;border-bottom:1px solid var(--line);}.option-chain-table td:nth-child(2){color:var(--yellow);font-weight:700;background:rgba(244,206,58,.045);}.option-chain-table .expiry-row td{background:var(--panel-2);text-align:left;color:var(--muted);font-size:12px;}.chain-mode #chartWrap,.chain-mode .periods,.chain-mode .indicator-row{visibility:hidden;}.tabs{overflow-x:auto;white-space:nowrap;}.tabs>*{flex-shrink:0;}
+@media(max-width:1000px){#optionChainPanel{height:60dvh;min-height:460px;}.option-chain-head{padding:10px 12px;gap:8px;}.option-chain-table{font-size:14px;}}
+@media(max-width:600px){#optionChainPanel{height:62dvh;min-height:420px;}.tabs{gap:20px;}.option-chain-head h2{font-size:16px;}.option-chain-head small{font-size:10px;}.option-chain-table td{padding:10px 6px;}}
+</style></head>
 <body>
   <main class="app">
     <div class="status-spacer"></div>
@@ -620,7 +627,8 @@
     </header>
 
     <nav class="tabs">
-      <div class="tab active">價格</div>
+      <div id="priceTab" class="tab active" role="tab" tabindex="0" aria-selected="true">價格</div>
+      <button id="optionChainTab" class="tab" role="tab" aria-selected="false" hidden>期權鏈</button>
       <div class="tab">資訊</div>
       <div class="tab">交易數據</div>
     </nav>
@@ -708,6 +716,10 @@
       <div id="errorBox"></div>
     </section>
 
+    <section id="optionChainPanel" hidden aria-label="即時 BTC 期權鏈">
+      <div class="option-chain-head"><h2>BTC 期權鏈</h2><select id="optionChainExpiry" aria-label="契約日"><option value="">目前契約日</option></select><small id="optionChainStatus">等待標記價格…</small></div>
+      <div class="option-chain-scroll"><table class="option-chain-table"><thead><tr><th>CALL 標記價格</th><th>履約價</th><th>PUT 標記價格</th></tr></thead><tbody id="optionChainBody"></tbody></table></div>
+    </section>
     <footer class="bottom-info">
       <div id="apiState" class="api-state">
         <i class="dot"></i><span>等待資料</span>
@@ -1095,6 +1107,51 @@
     candleSeries.setMarkers(markers);
   }
 
+  let optionChainVisible = false;
+  const allOptionMarks = new Map();
+  function setOptionChainView(show) {
+    optionChainVisible = show && liveMode;
+    document.querySelector('.app').classList.toggle('chain-mode',optionChainVisible);
+    document.getElementById('optionChainPanel').hidden = !optionChainVisible;
+    document.getElementById('priceTab').classList.toggle('active',!optionChainVisible);
+    document.getElementById('priceTab').setAttribute('aria-selected',String(!optionChainVisible));
+    document.getElementById('optionChainTab').classList.toggle('active',optionChainVisible);
+    document.getElementById('optionChainTab').setAttribute('aria-selected',String(optionChainVisible));
+    if(optionChainVisible)renderOptionChain();
+  }
+  document.getElementById('optionChainTab').addEventListener('click',()=>setOptionChainView(true));
+  document.getElementById('priceTab').addEventListener('click',()=>setOptionChainView(false));
+  document.getElementById('priceTab').addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();setOptionChainView(false);}});
+  document.getElementById('optionChainExpiry').addEventListener('change',renderOptionChain);
+  function renderOptionChain() {
+    if(!optionChainVisible)return;
+    const select=document.getElementById('optionChainExpiry');
+    const dates=[...new Set(optionContracts.map(s=>Number(s.expiryDate)))].sort((a,b)=>a-b);
+    const previous=select.value;
+    const signature=dates.join(',');
+    if(select.dataset.dates!==signature){
+      select.innerHTML='<option value="">目前契約日</option><option value="all">全部契約日</option>'+dates.map(date=>'<option value="'+date+'">'+fmtFull(date).slice(0,10)+'</option>').join('');
+      select.value=previous==='all'||dates.includes(Number(previous))?previous:'';select.dataset.dates=signature;
+    }
+    const expiry=select.value==='all'?null:Number(select.value)||currentEndMs;
+    const groups=new Map();
+    for(const contract of optionContracts){
+      const date=Number(contract.expiryDate);if(expiry!==null&&date!==expiry)continue;
+      const strike=Number(contract.strikePrice),key=date+':'+strike;
+      if(!groups.has(key))groups.set(key,{date,strike});
+      groups.get(key)[contract.side]=contract.symbol;
+    }
+    const rows=[...groups.values()].sort((a,b)=>a.date-b.date||a.strike-b.strike);
+    const fresh=Date.now()-optionLastMessage<=10000;
+    const price=symbol=>fresh&&allOptionMarks.has(symbol)?fmtPrice(allOptionMarks.get(symbol)):'--';
+    let date=null;
+    document.getElementById('optionChainBody').innerHTML=rows.map(row=>{
+      let heading='';if(date!==row.date){date=row.date;heading='<tr class="expiry-row"><td colspan="3">契約日 '+fmtFull(date).slice(0,10)+'</td></tr>';}
+      return heading+'<tr><td>'+price(row.CALL)+'</td><td>'+fmtPrice(row.strike)+'</td><td>'+price(row.PUT)+'</td></tr>';
+    }).join('')||'<tr><td colspan="3">等待此契約日的期權資料…</td></tr>';
+    document.getElementById('optionChainStatus').textContent=fresh?'標記價格 · '+fmtFull(optionLastMessage):'等待標記價格連線…';
+  }
+
   function nearestOption(boundary, expiry, contracts) {
     return contracts.filter(s => Number(s.expiryDate) === expiry && s.side === boundary.side && Number.isFinite(Number(s.strikePrice))).sort((a,b) => Math.abs(Number(a.strikePrice)-boundary.price)-Math.abs(Number(b.strikePrice)-boundary.price) || Number(a.strikePrice)-Number(b.strikePrice))[0];
   }
@@ -1126,6 +1183,7 @@
       if (Number.isFinite(price)) optionValues.set(index,{symbol:contract.symbol,expiry:currentEndMs,price});
     });
     positionOptionMarks();
+    renderOptionChain();
   }
   function refreshOnlineOptions() {
     if (optionSocket && Date.now() - optionLastMessage > 15000) stopOnlineOptions();
@@ -1148,7 +1206,7 @@
           marks.set(row.s,Number(row.mp));
         }
         optionContracts = contracts;
-        onlineOptionMarks.clear();for(const [symbol,price] of marks) onlineOptionMarks.set(symbol,price);
+        onlineOptionMarks.clear();allOptionMarks.clear();for(const [symbol,price] of marks){onlineOptionMarks.set(symbol,price);allOptionMarks.set(symbol,price);}
         optionLastMessage = Date.now(); optionRetryDelay = 1000;
         applyOnlineOptionMarks();
       } catch { /* Ignore malformed packets without using other price fields. */ }
@@ -1178,6 +1236,8 @@
       const data=await response.json();if(!response.ok)throw Error(data.error);
       if(epoch!==optionEpoch || !liveMode)return;
       const marks=new Map(data.items.map(s=>[s.symbol,s.markPrice]));
+      allOptionMarks.clear();for(const [symbol,price] of marks)if(Number.isFinite(Number(price)))allOptionMarks.set(symbol,Number(price));
+      optionLastMessage=Date.now();
       optionValues.clear();
       optionBoundaries.forEach((boundary,index)=>{
         const contract=nearestOption(boundary,currentEndMs,optionContracts);
@@ -1185,9 +1245,9 @@
         if(raw!=null && raw!=='' && Number.isFinite(Number(raw)))optionValues.set(index,{symbol:contract.symbol,expiry:currentEndMs,price:Number(raw)});
       });
     }catch(error){optionValues.clear();}
-    finally{optionBusy=false;positionOptionMarks();}
+    finally{optionBusy=false;positionOptionMarks();renderOptionChain();}
   }
-  setInterval(refreshOptionMarks,1000);
+  setInterval(() => { refreshOptionMarks(); renderOptionChain(); },1000);
   for(const event of ['pointermove','pointerup','wheel'])chartWrap.addEventListener(event,()=>requestAnimationFrame(positionOptionMarks),{passive:true});
   chart.timeScale().subscribeVisibleLogicalRangeChange(positionOptionMarks);
 
@@ -1398,6 +1458,8 @@
   });
   document.getElementById('liveBtn').addEventListener('click', () => {
     liveMode = !liveMode;
+    document.getElementById("optionChainTab").hidden=!liveMode;
+    if(!liveMode)setOptionChainView(false);
     optionEpoch++;optionValues.clear();
     if(onlineOptions){stopOnlineOptions();optionRetryAt=0;optionRetryDelay=1000;}
     positionOptionMarks();
