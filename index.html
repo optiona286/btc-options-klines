@@ -705,6 +705,8 @@
           <button class="toggle active" data-indicator="highLow">高低價</button>
           <button class="toggle active" data-indicator="finalSession" title="到期前一天 16:00 至到期日 16:00（台灣時間）">最後 24h</button>
           <button class="toggle active" data-indicator="finalSixHours" title="到期日前最後 6 小時（台灣時間）">最後 6h</button>
+          <button class="toggle active" data-indicator="openingRange" title="最後 24h 第一根 K 線的最高與最低價，向右延伸透明漸層">首根高低範圍</button>
+          <button class="toggle active" data-indicator="baseline" title="最後 24h 第一根 K 線（最高價＋最低價）÷ 2，白色實線">基準線</button>
           <button class="toggle active" data-indicator="idealRange" title="BTC/USD：最後 24h 第一根開盤價上下 2,000 點，虛線不透明度 30%">理想範圍</button>
           <button class="toggle active" data-indicator="realityRange" title="BTC/USD：最後 24h 第一根開盤價上下 1,000 點，虛線不透明度 30%">現實範圍</button>
           <button class="toggle active" data-indicator="volume">成交量</button>
@@ -755,7 +757,7 @@
       hover: -1,
       dragging: false,
       dragX: 0,
-      indicators: { ma7: true, ma20: true, bb: false, highLow: true, volume: true, finalSession: true, finalSixHours: true, idealRange: true, realityRange: true },
+      indicators: { ma7: true, ma20: true, bb: false, highLow: true, volume: true, finalSession: true, finalSixHours: true, openingRange: true, baseline: true, idealRange: true, realityRange: true },
       expiry: "", favorites: [], mode: "strike", autoRefresh: false,
       busy: false, metaBusy: false, requestId: 0, controller: null,
       studies: null, hoverY: null,
@@ -1137,6 +1139,54 @@
       return new Date(time + 8 * 3600000).toISOString().slice(0, 16).replace("T", " ");
     }
 
+    function openingCandleReference(allRows) {
+      const session = finalSessionWindow();
+      if (!session) return null;
+      const first = allRows.find(row => barTaiwanTime(row) === session.start);
+      if (!first || !Number.isFinite(first.high) || !Number.isFinite(first.low) || first.high < first.low) return null;
+      return { start: session.start, high: first.high, low: first.low, midpoint: (first.high + first.low) / 2 };
+    }
+
+    function drawOpeningReference(context, allRows, slots, left, top, width, bottom, y, layer) {
+      if (!slots.length || !state.indicators[layer === "band" ? "openingRange" : "baseline"]) return;
+      const reference = openingCandleReference(allRows);
+      if (!reference) return;
+      // Use chart time slots, so the comparison chart keeps missing candles aligned.
+      const firstVisible = slots.findIndex(row => barTaiwanTime(row) >= reference.start);
+      if (firstVisible < 0) return;
+      const startX = left + firstVisible * width / slots.length;
+      const right = left + width;
+      context.save();
+      context.beginPath(); context.rect(left, top, width, bottom - top); context.clip();
+      if (layer === "band") {
+        const highY = y(reference.high), lowY = y(reference.low);
+        const gradient = context.createLinearGradient(startX, 0, right, 0);
+        gradient.addColorStop(0, "rgba(255,255,255,.20)");
+        gradient.addColorStop(.55, "rgba(255,255,255,.09)");
+        gradient.addColorStop(1, "rgba(255,255,255,.02)");
+        context.fillStyle = gradient;
+        context.fillRect(startX, highY, right - startX, Math.max(1, lowY - highY));
+      } else {
+        const py = y(reference.midpoint);
+        context.strokeStyle = "#ffffff";
+        context.lineWidth = 1.5;
+        context.setLineDash([]);
+        context.beginPath(); context.moveTo(startX, py); context.lineTo(right, py); context.stroke();
+        if (py >= top && py <= bottom) {
+          const label = "基準線 · " + fmt(reference.midpoint, 2);
+          context.font = "11px Segoe UI, Microsoft JhengHei";
+          context.textAlign = "left";
+          const textX = Math.max(startX + 4, right - context.measureText(label).width - 8);
+          const textY = py < top + 17 ? py + 14 : py - 5;
+          context.fillStyle = "rgba(17,24,35,.85)";
+          context.fillRect(textX - 3, textY - 11, context.measureText(label).width + 6, 15);
+          context.fillStyle = "#ffffff";
+          context.fillText(label, textX, textY);
+        }
+      }
+      context.restore();
+    }
+
     function btcRangeBoundaries(allRows) {
       const session = finalSessionWindow();
       if (!session) return [];
@@ -1367,6 +1417,7 @@
         context.strokeStyle = "#202b3b"; context.beginPath(); context.moveTo(x(i), top); context.lineTo(x(i), bottom); context.stroke();
         context.fillStyle = "#718096"; context.textAlign = "center"; context.fillText(row.time.slice(5, 16), x(i), h - 8);
       });
+      drawOpeningReference(context, state.btcRows, slots, left, top, width, bottom, y, "band");
       const candleWidth = Math.max(.5, width / slots.length * .8);
       rows.forEach((row, i) => {
         if (!row) return; // Missing source intervals keep their empty time slot.
@@ -1383,6 +1434,7 @@
         context.stroke();
       }
       drawBtcRanges(context, boundaries, left, top, width, bottom, y);
+      drawOpeningReference(context, state.btcRows, slots, left, top, width, bottom, y, "line");
       const hover = state.hover >= state.start && state.hover < state.start + slots.length ? state.hover - state.start : -1;
       const row = hover >= 0 ? rows[hover] : valid.at(-1);
       if (hover >= 0) {
@@ -1485,6 +1537,7 @@
         ctx.fillText(row.time.slice(5, 16), gx, h - 8);
       });
 
+      drawOpeningReference(ctx, state.rows, rows, left, top, plotW, priceBottom, y, "band");
       const step = plotW / rows.length;
       const candleW = Math.max(.5, step * .94);
       rows.forEach((row, i) => {
@@ -1503,6 +1556,7 @@
       });
 
       drawBtcRanges(ctx, boundaries, left, top, plotW, priceBottom, y);
+      drawOpeningReference(ctx, state.rows, rows, left, top, plotW, priceBottom, y, "line");
 
       function line(valuesToDraw, color, width = 1.5) {
         ctx.strokeStyle = color;
