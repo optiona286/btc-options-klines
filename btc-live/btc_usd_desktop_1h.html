@@ -655,6 +655,9 @@
 .analysis-averages{display:flex;gap:15px;white-space:nowrap;overflow-x:auto;padding-top:3px;scrollbar-width:thin;}.analysis-ma{flex-shrink:0;}.analysis-ma b{font-weight:650;margin-left:4px;}.ma-color-0{color:#f4ce3a;}.ma-color-1{color:#f38bbe;}.ma-color-2{color:#b1a1ff;}
 #optionAnalysisStatus{line-height:1.6;}[data-analysis-side].active{background:rgba(244,206,58,.1);}
 @media(max-width:600px){#optionAnalysisPanel{min-height:500px;height:68dvh;}#optionAnalysisInfo{padding:6px 8px;font-size:11px;}.analysis-periods{gap:5px;padding:8px;}.analysis-periods>span{flex-basis:100%;font-size:12px;color:#b9c7d9;}.analysis-inline-row{gap:10px;}}
+
+#analysis24Range{position:absolute;top:0;z-index:2;pointer-events:none;background:rgba(244,206,58,.075);border-left:1px dashed rgba(244,206,58,.65);border-right:1px dashed rgba(244,206,58,.65);overflow:hidden;}
+#analysis24Range[hidden]{display:none;}#analysis24Range>span{position:absolute;top:8px;left:8px;color:#f4ce3a;background:rgba(16,23,34,.85);border-radius:4px;padding:3px 7px;font-size:12px;white-space:nowrap;}
 </style></head>
 <body>
   <main class="app">
@@ -763,7 +766,7 @@
     <section id="optionAnalysisPanel" hidden aria-label="Bybit 期權標記價格技術分析">
       <div class="analysis-head"><strong id="optionAnalysisTitle">Bybit 期權技術分析</strong><button id="returnSpotBtn">返回 BTC 現貨</button></div>
       <div class="analysis-periods"><span>Bybit 標記價格</span><button data-analysis-side="CALL" class="active">CALL</button><button data-analysis-side="PUT">PUT</button><button data-option-interval="15">15分</button><button data-option-interval="60" class="active">1小時</button><button data-option-interval="240">4小時</button></div>
-      <div id="optionAnalysisInfo">開 --　高 --　低 --　收 --</div><div id="optionAnalysisChart"></div><div id="optionAnalysisStatus" role="status">等待契約資料…</div>
+      <div id="optionAnalysisInfo">開 --　高 --　低 --　收 --</div><div id="optionAnalysisChart"><div id="analysis24Range" hidden><span>最後 24 小時</span></div></div><div id="optionAnalysisStatus" role="status">等待契約資料…</div>
     </section>
 
     <section id="optionChainPanel" hidden aria-label="即時 BTC 期權鏈">
@@ -1216,6 +1219,7 @@
 
   // Binance remains the source of overlay/chain marks; analysis uses Bybit only.
   let preferredOptionSide='CALL',selectedBinanceSymbol='';
+  let analysisExpiry=0;
   let analysisVisible=false,analysisSymbol='',analysisInterval='60',analysisVersion=0,analysisBusy=false;
   let bybitContracts=[],bybitContractsAt=0,bybitPending=null,analysisBars=[];
   let analysisChart=null,analysisCandle=null,analysisMAs=[];
@@ -1242,10 +1246,11 @@
   function ensureAnalysisChart(){
     if(analysisChart)return;
     const host=document.getElementById('optionAnalysisChart');
-    analysisChart=LightweightCharts.createChart(host,{layout:{background:{color:'#101722'},textColor:'#9aa9bb'},grid:{vertLines:{color:'#263140'},horzLines:{color:'#263140'}},rightPriceScale:{borderColor:'#303c4c'},timeScale:{timeVisible:true,borderColor:'#303c4c'},localization:{priceFormatter:fmtPrice,timeFormatter:time=>fmtFull(Number(time)*1000)}});
+    analysisChart=LightweightCharts.createChart(host,{layout:{background:{color:'#101722'},textColor:'#9aa9bb'},grid:{vertLines:{color:'#263140'},horzLines:{color:'#263140'}},rightPriceScale:{borderColor:'#303c4c'},timeScale:{timeVisible:true,borderColor:'#303c4c',tickMarkFormatter:time=>fmtMDHM(Number(time)*1000)},localization:{priceFormatter:fmtPrice,timeFormatter:time=>fmtFull(Number(time)*1000)}});
     analysisCandle=analysisChart.addCandlestickSeries({upColor:'#29c39a',downColor:'#f64e66',borderVisible:false,wickUpColor:'#29c39a',wickDownColor:'#f64e66',priceFormat:{type:'price',precision:4,minMove:.0001}});
     analysisMAs=[7,25,99].map((period,i)=>({period,series:analysisChart.addLineSeries({color:['#f4ce3a','#e86cad','#8b79dd'][i],lineWidth:1,priceLineVisible:false,lastValueVisible:false})}));
-    new ResizeObserver(()=>analysisChart.resize(host.clientWidth,host.clientHeight)).observe(host);
+    new ResizeObserver(()=>{const range=analysisChart.timeScale().getVisibleLogicalRange();analysisChart.resize(host.clientWidth,host.clientHeight);if(range)analysisChart.timeScale().setVisibleLogicalRange(range);updateAnalysis24Range();}).observe(host);
+    analysisChart.timeScale().subscribeVisibleLogicalRangeChange(updateAnalysis24Range);
     analysisChart.subscribeCrosshairMove(event=>{
       if(event.time){const bar=event.seriesData.get(analysisCandle);if(bar)showAnalysisInfo(bar);}
       else if(analysisBars.length)showAnalysisInfo(analysisBars[analysisBars.length-1]);
@@ -1262,9 +1267,31 @@
     const stamp=new Date(bar.time*1000+8*3600000).toISOString().slice(0,16).replace('T',' ').replace(/-/g,'/');
     document.getElementById('optionAnalysisInfo').innerHTML='<div class="analysis-inline-row"><time>'+stamp+'</time>'+values+'</div><div class="analysis-averages">'+averages+'</div>';
   }
+  function updateAnalysis24Range(){
+    const overlay=document.getElementById('analysis24Range');
+    if(!analysisChart||!analysisBars.length||!analysisExpiry){overlay.hidden=true;return;}
+    const scale=analysisChart.timeScale(),step=Number(analysisInterval)*60;
+    const logicalAt=time=>{
+      if(time<=analysisBars[0].time)return (time-analysisBars[0].time)/step;
+      for(let i=1;i<analysisBars.length;i++)if(time<=analysisBars[i].time)return i-1+(time-analysisBars[i-1].time)/(analysisBars[i].time-analysisBars[i-1].time);
+      return analysisBars.length-1+(time-analysisBars[analysisBars.length-1].time)/step;
+    };
+    const end=analysisExpiry/1000,start=end-24*3600;
+    const x1=scale.logicalToCoordinate(logicalAt(start)),x2=scale.logicalToCoordinate(logicalAt(end));
+    const host=document.getElementById('optionAnalysisChart'),width=host.clientWidth-analysisChart.priceScale('right').width();
+    if(x1===null||x2===null||x2<=0||x1>=width){overlay.hidden=true;return;}
+    const left=Math.max(0,x1),right=Math.min(width,x2);
+    overlay.hidden=right<=left;overlay.style.left=left+'px';overlay.style.width=Math.max(0,right-left)+'px';
+    overlay.style.height=Math.max(0,host.clientHeight-scale.height())+'px';
+    overlay.style.borderLeftColor=x1>=0?'rgba(244,206,58,.65)':'transparent';
+    overlay.style.borderRightColor=x2<=width?'rgba(244,206,58,.65)':'transparent';
+    overlay.title=fmtFull(start*1000)+' → '+fmtFull(end*1000)+'（台灣時間）';
+  }
   function updateAnalysisExtremes(bars){
     if(!bars.length){analysisCandle.setMarkers([]);return;}
-    const high=bars.reduce((a,b)=>b.high>a.high?b:a),low=bars.reduce((a,b)=>b.low<a.low?b:a);
+    const step=Number(analysisInterval)*60;
+    const recent=bars.filter(bar=>bar.time>=bars[bars.length-1].time-48*3600+step);
+    const high=recent.reduce((a,b)=>b.high>a.high?b:a),low=recent.reduce((a,b)=>b.low<a.low?b:a);
     analysisCandle.setMarkers([
       {time:high.time,position:'aboveBar',color:'#ff8292',shape:'arrowDown',text:'最高 '+fmtPrice(high.high)},
       {time:low.time,position:'belowBar',color:'#49dcb4',shape:'arrowUp',text:'最低 '+fmtPrice(low.low)}
@@ -1279,23 +1306,27 @@
       if(version!==analysisVersion)return;
       const bars=(result.list||[]).map(k=>({time:Math.floor(Number(k[0])/1000),open:Number(k[1]),high:Number(k[2]),low:Number(k[3]),close:Number(k[4])})).filter(b=>[b.time,b.open,b.high,b.low,b.close].every(Number.isFinite)).sort((a,b)=>a.time-b.time);
       analysisBars=bars;analysisCandle.setData(bars);updateAnalysisExtremes(bars);analysisMAs.forEach(({period,series})=>series.setData(maData(bars,period)));
-      if(!background&&bars.length)analysisChart.timeScale().setVisibleLogicalRange({from:-Math.ceil(bars.length*.06),to:bars.length+Math.ceil(bars.length*.2)});
+      if(!background&&bars.length){
+        const step=Number(analysisInterval)*60,count=48*3600/step;
+        analysisChart.timeScale().setVisibleLogicalRange({from:bars.length-count-.5,to:bars.length-.5});
+      }
+      requestAnimationFrame(updateAnalysis24Range);
       if(bars.length)showAnalysisInfo(bars[bars.length-1]);
-      analysisStatus.textContent=bars.length?'Bybit 歷史標記價格 · '+bars.length+' 根 K · '+fmtFull(bars[0].time*1000)+' 起 · 每 5 秒更新 · '+fmtFull(Date.now()):'Bybit 此契約尚無歷史標記價格資料';
+      analysisStatus.textContent=bars.length?'預設最近 2 日 · 契約最後 24h '+fmtFull(analysisExpiry-24*3600000)+' → '+fmtFull(analysisExpiry)+'（台灣） · Bybit '+bars.length+' 根 K · '+fmtFull(bars[0].time*1000)+' 起 · 每 5 秒更新 · '+fmtFull(Date.now()):'Bybit 此契約尚無歷史標記價格資料';
     }catch(error){if(version===analysisVersion)analysisStatus.textContent='Bybit 資料讀取失敗：'+error.message+(analysisBars.length?'，保留上次資料':'');}
     finally{if(version===analysisVersion)analysisBusy=false;}
   }
   async function openOptionAnalysis(binanceSymbol){
     if(!liveMode)return;
     const contract=optionContracts.find(item=>item.symbol===binanceSymbol);if(!contract)return;
-    preferredOptionSide=contract.side;selectedBinanceSymbol=binanceSymbol;
+    analysisExpiry=Number(contract.expiryDate);preferredOptionSide=contract.side;selectedBinanceSymbol=binanceSymbol;
     document.querySelectorAll('[data-analysis-side]').forEach(button=>button.classList.toggle('active',button.dataset.analysisSide===contract.side));
     setOptionChainView(false);analysisVisible=true;analysisSymbol='';analysisBusy=false;
     document.querySelector('.app').classList.add('option-analysis-mode');analysisPanel.hidden=false;
     const version=++analysisVersion;
     document.getElementById('optionAnalysisTitle').textContent='Bybit · 對應 '+binanceSymbol;
     analysisStatus.textContent='尋找相同到期時間、履約價與 CALL／PUT 的 Bybit 契約…';
-    ensureAnalysisChart();analysisBars=[];analysisCandle.setData([]);analysisCandle.setMarkers([]);analysisMAs.forEach(({series})=>series.setData([]));document.getElementById('optionAnalysisInfo').textContent='開 --　高 --　低 --　收 --';
+    ensureAnalysisChart();analysisBars=[];document.getElementById('analysis24Range').hidden=true;analysisCandle.setData([]);analysisCandle.setMarkers([]);analysisMAs.forEach(({series})=>series.setData([]));document.getElementById('optionAnalysisInfo').textContent='開 --　高 --　低 --　收 --';
     try{
       const contracts=await getBybitContracts();if(version!==analysisVersion)return;
       const side=contract.side==='CALL'?'Call':'Put';
