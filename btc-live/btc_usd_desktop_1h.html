@@ -645,6 +645,16 @@
 @media(min-width:1001px){.app.chain-mode,.app.option-analysis-mode{grid-template-rows:64px 48px 0 0 minmax(500px,calc(100dvh - 150px)) 38px;}}
 @media(max-width:1000px){.app.chain-mode,.app.option-analysis-mode{grid-template-rows:60px 44px auto auto 0 0 minmax(460px,60dvh) auto auto;}}
 @media(max-width:600px){.app.chain-mode,.app.option-analysis-mode{grid-template-rows:56px 42px auto auto 0 0 minmax(420px,62dvh) auto auto;}}
+
+.chain-strike{font-weight:750;color:#f1f5fa;}.chain-strike:hover{background:rgba(244,206,58,.1);border-radius:5px;}
+#optionAnalysisInfo{background:#101722;border-top:1px solid #303c4c;border-bottom:1px solid #303c4c;margin:0;padding:7px 12px;color:#9aa9bb;font-size:12px;line-height:1.6;}
+.analysis-inline-row{display:flex;align-items:center;gap:12px;overflow-x:auto;white-space:nowrap;scrollbar-width:thin;padding-bottom:3px;}
+.analysis-inline-row time{color:#a9b7cb;font-variant-numeric:tabular-nums;}
+.analysis-inline-item,.analysis-inline-row time{flex-shrink:0;}.analysis-inline-item>b{font-weight:650;margin-left:3px;font-variant-numeric:tabular-nums;}
+.value-up{color:#49dcb4;}.value-down{color:#ff8292;}
+.analysis-averages{display:flex;gap:15px;white-space:nowrap;overflow-x:auto;padding-top:3px;scrollbar-width:thin;}.analysis-ma{flex-shrink:0;}.analysis-ma b{font-weight:650;margin-left:4px;}.ma-color-0{color:#f4ce3a;}.ma-color-1{color:#f38bbe;}.ma-color-2{color:#b1a1ff;}
+#optionAnalysisStatus{line-height:1.6;}[data-analysis-side].active{background:rgba(244,206,58,.1);}
+@media(max-width:600px){#optionAnalysisPanel{min-height:500px;height:68dvh;}#optionAnalysisInfo{padding:6px 8px;font-size:11px;}.analysis-periods{gap:5px;padding:8px;}.analysis-periods>span{flex-basis:100%;font-size:12px;color:#b9c7d9;}.analysis-inline-row{gap:10px;}}
 </style></head>
 <body>
   <main class="app">
@@ -752,7 +762,7 @@
 
     <section id="optionAnalysisPanel" hidden aria-label="Bybit 期權標記價格技術分析">
       <div class="analysis-head"><strong id="optionAnalysisTitle">Bybit 期權技術分析</strong><button id="returnSpotBtn">返回 BTC 現貨</button></div>
-      <div class="analysis-periods"><span>Bybit 標記價格</span><button data-option-interval="15">15分</button><button data-option-interval="60" class="active">1小時</button><button data-option-interval="240">4小時</button></div>
+      <div class="analysis-periods"><span>Bybit 標記價格</span><button data-analysis-side="CALL" class="active">CALL</button><button data-analysis-side="PUT">PUT</button><button data-option-interval="15">15分</button><button data-option-interval="60" class="active">1小時</button><button data-option-interval="240">4小時</button></div>
       <div id="optionAnalysisInfo">開 --　高 --　低 --　收 --</div><div id="optionAnalysisChart"></div><div id="optionAnalysisStatus" role="status">等待契約資料…</div>
     </section>
 
@@ -1196,7 +1206,7 @@
       if(hasSpot&&!spotInserted&&spot<=row.strike){heading+=spotRow();spotInserted=true;}
       const callClass=hasSpot&&row.strike<spot?'call-itm':'';
       const putClass=hasSpot&&row.strike>spot?'put-itm':'';
-      let html=heading+'<tr><td class="'+callClass+'">'+markButton(row.CALL)+'</td><td>'+fmtPrice(row.strike)+'</td><td class="'+putClass+'">'+markButton(row.PUT)+'</td></tr>';
+      let html=heading+'<tr><td class="'+callClass+'">'+markButton(row.CALL)+'</td><td><button class="chain-mark chain-strike" data-option-call="'+(row.CALL||'')+'" data-option-put="'+(row.PUT||'')+'" title="查看此履約價的期權技術分析">'+fmtPrice(row.strike)+'</button></td><td class="'+putClass+'">'+markButton(row.PUT)+'</td></tr>';
       if(hasSpot&&!spotInserted&&(!rows[index+1]||rows[index+1].date!==row.date)){html+=spotRow();spotInserted=true;}
       return html;
     }).join('')||'<tr><td colspan="3">等待此契約日的期權資料…</td></tr>';
@@ -1205,6 +1215,7 @@
 
 
   // Binance remains the source of overlay/chain marks; analysis uses Bybit only.
+  let preferredOptionSide='CALL',selectedBinanceSymbol='';
   let analysisVisible=false,analysisSymbol='',analysisInterval='60',analysisVersion=0,analysisBusy=false;
   let bybitContracts=[],bybitContractsAt=0,bybitPending=null,analysisBars=[];
   let analysisChart=null,analysisCandle=null,analysisMAs=[];
@@ -1241,7 +1252,23 @@
     });
   }
   function showAnalysisInfo(bar){
-    document.getElementById('optionAnalysisInfo').textContent='開 '+fmtPrice(bar.open)+'　高 '+fmtPrice(bar.high)+'　低 '+fmtPrice(bar.low)+'　收 '+fmtPrice(bar.close)+'　高低差 '+fmtPrice(bar.high-bar.low)+'　'+analysisMAs.map(({period})=>{const data=maData(analysisBars.filter(item=>item.time<=bar.time),period);return 'MA('+period+'): '+(data.length?fmtPrice(data[data.length-1].value):'--');}).join('　');
+    const change=bar.close-bar.open,pct=bar.open?change/bar.open*100:0;
+    const amplitude=bar.open?(bar.high-bar.low)/bar.open*100:0;
+    const direction=change>=0?'value-up':'value-down';
+    const fields=[['開盤價',fmtPrice(bar.open)],['最高價',fmtPrice(bar.high)],['最低價',fmtPrice(bar.low)],['收盤價',fmtPrice(bar.close)],['變化',(pct>=0?'+':'')+pct.toFixed(2)+'%'],['振幅',amplitude.toFixed(2)+'%'],['高低差',fmtPrice(bar.high-bar.low)]];
+    const values=fields.map(([label,value])=>'<span class="analysis-inline-item"><span>'+label+'</span> <b class="'+direction+'">'+value+'</b></span>').join('');
+    const history=analysisBars.filter(item=>item.time<=bar.time);
+    const averages=analysisMAs.map(({period},i)=>{const data=maData(history,period);return '<span class="analysis-ma"><span>MA('+period+')</span> <b class="ma-color-'+i+'">'+(data.length?fmtPrice(data[data.length-1].value):'--')+'</b></span>';}).join('');
+    const stamp=new Date(bar.time*1000+8*3600000).toISOString().slice(0,16).replace('T',' ').replace(/-/g,'/');
+    document.getElementById('optionAnalysisInfo').innerHTML='<div class="analysis-inline-row"><time>'+stamp+'</time>'+values+'</div><div class="analysis-averages">'+averages+'</div>';
+  }
+  function updateAnalysisExtremes(bars){
+    if(!bars.length){analysisCandle.setMarkers([]);return;}
+    const high=bars.reduce((a,b)=>b.high>a.high?b:a),low=bars.reduce((a,b)=>b.low<a.low?b:a);
+    analysisCandle.setMarkers([
+      {time:high.time,position:'aboveBar',color:'#ff8292',shape:'arrowDown',text:'最高 '+fmtPrice(high.high)},
+      {time:low.time,position:'belowBar',color:'#49dcb4',shape:'arrowUp',text:'最低 '+fmtPrice(low.low)}
+    ].sort((a,b)=>a.time-b.time));
   }
   async function loadOptionAnalysis(background=false){
     if(!analysisSymbol||!liveMode||background&&analysisBusy)return;
@@ -1251,8 +1278,8 @@
       const result=await bybitGet('mark-price-kline',{category:'option',symbol,interval,limit:'500'});
       if(version!==analysisVersion)return;
       const bars=(result.list||[]).map(k=>({time:Math.floor(Number(k[0])/1000),open:Number(k[1]),high:Number(k[2]),low:Number(k[3]),close:Number(k[4])})).filter(b=>[b.time,b.open,b.high,b.low,b.close].every(Number.isFinite)).sort((a,b)=>a.time-b.time);
-      analysisBars=bars;analysisCandle.setData(bars);analysisMAs.forEach(({period,series})=>series.setData(maData(bars,period)));
-      if(!background)analysisChart.timeScale().fitContent();
+      analysisBars=bars;analysisCandle.setData(bars);updateAnalysisExtremes(bars);analysisMAs.forEach(({period,series})=>series.setData(maData(bars,period)));
+      if(!background&&bars.length)analysisChart.timeScale().setVisibleLogicalRange({from:-Math.ceil(bars.length*.06),to:bars.length+Math.ceil(bars.length*.2)});
       if(bars.length)showAnalysisInfo(bars[bars.length-1]);
       analysisStatus.textContent=bars.length?'Bybit 歷史標記價格 · '+bars.length+' 根 K · '+fmtFull(bars[0].time*1000)+' 起 · 每 5 秒更新 · '+fmtFull(Date.now()):'Bybit 此契約尚無歷史標記價格資料';
     }catch(error){if(version===analysisVersion)analysisStatus.textContent='Bybit 資料讀取失敗：'+error.message+(analysisBars.length?'，保留上次資料':'');}
@@ -1261,12 +1288,14 @@
   async function openOptionAnalysis(binanceSymbol){
     if(!liveMode)return;
     const contract=optionContracts.find(item=>item.symbol===binanceSymbol);if(!contract)return;
+    preferredOptionSide=contract.side;selectedBinanceSymbol=binanceSymbol;
+    document.querySelectorAll('[data-analysis-side]').forEach(button=>button.classList.toggle('active',button.dataset.analysisSide===contract.side));
     setOptionChainView(false);analysisVisible=true;analysisSymbol='';analysisBusy=false;
     document.querySelector('.app').classList.add('option-analysis-mode');analysisPanel.hidden=false;
     const version=++analysisVersion;
     document.getElementById('optionAnalysisTitle').textContent='Bybit · 對應 '+binanceSymbol;
     analysisStatus.textContent='尋找相同到期時間、履約價與 CALL／PUT 的 Bybit 契約…';
-    ensureAnalysisChart();analysisBars=[];analysisCandle.setData([]);analysisMAs.forEach(({series})=>series.setData([]));document.getElementById('optionAnalysisInfo').textContent='開 --　高 --　低 --　收 --';
+    ensureAnalysisChart();analysisBars=[];analysisCandle.setData([]);analysisCandle.setMarkers([]);analysisMAs.forEach(({series})=>series.setData([]));document.getElementById('optionAnalysisInfo').textContent='開 --　高 --　低 --　收 --';
     try{
       const contracts=await getBybitContracts();if(version!==analysisVersion)return;
       const side=contract.side==='CALL'?'Call':'Put';
@@ -1278,7 +1307,11 @@
       await loadOptionAnalysis();
     }catch(error){if(version===analysisVersion)analysisStatus.textContent='Bybit 契約讀取失敗：'+error.message;}
   }
-  document.getElementById('optionChainBody').addEventListener('click',event=>{const button=event.target.closest('[data-option-symbol]');if(button)openOptionAnalysis(button.dataset.optionSymbol);});
+  document.getElementById('optionChainBody').addEventListener('click',event=>{
+    const button=event.target.closest('[data-option-symbol],.chain-strike');if(!button)return;
+    const symbol=button.dataset.optionSymbol||(preferredOptionSide==='PUT'?button.dataset.optionPut:button.dataset.optionCall)||button.dataset.optionCall||button.dataset.optionPut;
+    if(symbol)openOptionAnalysis(symbol);
+  });
   for(let index=0;index<4;index++){
     const mark=document.getElementById('optionMark'+index);
     const open=()=>{if(mark.dataset.optionSymbol)openOptionAnalysis(mark.dataset.optionSymbol);};
@@ -1287,6 +1320,12 @@
   document.getElementById('returnSpotBtn').addEventListener('click',()=>{closeOptionAnalysis();setOptionChainView(false);});
   document.querySelectorAll('[data-option-interval]').forEach(button=>button.addEventListener('click',()=>{
     analysisInterval=button.dataset.optionInterval;document.querySelectorAll('[data-option-interval]').forEach(item=>item.classList.toggle('active',item===button));loadOptionAnalysis();
+  }));
+  document.querySelectorAll('[data-analysis-side]').forEach(button=>button.addEventListener('click',()=>{
+    const current=optionContracts.find(item=>item.symbol===selectedBinanceSymbol);
+    if(!current)return;
+    const target=optionContracts.find(item=>Number(item.expiryDate)===Number(current.expiryDate)&&Number(item.strikePrice)===Number(current.strikePrice)&&item.side===button.dataset.analysisSide);
+    if(target)openOptionAnalysis(target.symbol);
   }));
   setInterval(()=>{if(analysisVisible&&!document.hidden)loadOptionAnalysis(true);},5000);
 
