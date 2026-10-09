@@ -107,6 +107,8 @@
       outline: none;
     }
     select:focus, input:focus { border-color: var(--cyan); }
+    .expiry-date-controls { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 6px; }
+    .expiry-date-controls select { min-width: 0; padding-left: 6px; padding-right: 6px; }
     .chain-toolbar {
       display: grid;
       grid-template-columns: minmax(0, 1fr) 96px;
@@ -622,8 +624,12 @@
         <div class="field">
           <div id="importStatus" role="status" style="font-size:11px;color:var(--muted);margin-bottom:6px;overflow-wrap:anywhere">自動轉換：連線中…</div>
           <label for="datasetMode">資料模式</label><select id="datasetMode" style="margin-bottom:8px"><option value="data">原有標記價格（data）</option><option value="data1">幣安成交 K 線（data1）</option></select>
-          <label for="fileSelect">選擇到期日期</label>
-          <select id="fileSelect"></select>
+          <label for="fileYear">選擇到期日期</label>
+          <div class="expiry-date-controls">
+            <select id="fileYear" aria-label="到期年份"></select>
+            <select id="fileMonth" aria-label="到期月份"></select>
+            <select id="fileSelect" aria-label="到期日期"></select>
+          </div>
         </div>
         <div class="field">
           <label for="periodSelect">K 線週期</label>
@@ -799,6 +805,8 @@
     const $ = (id) => document.getElementById(id);
     const ui = {
       file: $("fileSelect"),
+      fileYear: $("fileYear"),
+      fileMonth: $("fileMonth"),
       period: $("periodSelect"),
       expiry: $("expirySelect"),
       mode: $("chainMode"),
@@ -896,6 +904,24 @@
       resizeAndDraw();
     }
 
+    function renderDateSelectors({ year, month } = {}) {
+      const files = (state.dateFiles || []).filter(file => /^\d{4}-\d{2}-\d{2}$/.test(file.date));
+      const current = files.find(file => file.name === state.file) || files[0];
+      const years = [...new Set(files.map(file => file.date.slice(0, 4)))].sort().reverse();
+      year = years.includes(year) ? year : current?.date.slice(0, 4);
+      ui.fileYear.innerHTML = years.map(value => '<option value="' + value + '">' + value + ' 年</option>').join('');
+      ui.fileYear.value = year || '';
+      const months = [...new Set(files.filter(file => file.date.startsWith(year + '-')).map(file => file.date.slice(5, 7)))].sort();
+      month = months.includes(month) ? month : (months.includes(current?.date.slice(5, 7)) ? current.date.slice(5, 7) : months[0]);
+      ui.fileMonth.innerHTML = months.map(value => '<option value="' + value + '">' + Number(value) + ' 月</option>').join('');
+      ui.fileMonth.value = month || '';
+      const dates = files.filter(file => file.date.startsWith(year + '-' + month + '-')).sort((a, b) => a.date.localeCompare(b.date));
+      ui.file.innerHTML = dates.map(file => '<option value="' + esc(file.name) + '">' + Number(file.date.slice(8, 10)) + ' 日</option>').join('');
+      const selected = dates.find(file => file.name === state.file) || dates.find(file => file.date.slice(8, 10) === current?.date.slice(8, 10)) || dates[0];
+      ui.file.value = selected?.name || '';
+      for (const control of [ui.fileYear, ui.fileMonth, ui.file]) control.disabled = !files.length;
+    }
+
     async function loadMeta({ preserveFile = false, preserveView = false } = {}) {
       const request = beginRequest();
       state.metaBusy = true;
@@ -921,9 +947,8 @@
       ui.mode.value = state.mode;
       $("sourceInfo").textContent = `${state.datasetMode === "data1" ? "幣安成交" : "標記價格"} · 到期日 ${data.file.date} · 前兩天＋當天 ${data.file.firstDate} ～ ${data.file.lastDate} · 檔案更新 ${new Date(data.file.modifiedAt).toLocaleString("zh-TW", { hour12: false, timeZone: "Asia/Taipei" })} · 台北時間${data.file.missingDates?.length ? ` · 缺來源 ${data.file.missingDates.join("、")}` : ""}`;
 
-      ui.file.innerHTML = data.files.map((file) =>
-        `<option value="${esc(file.name)}" ${file.name === state.file ? "selected" : ""}>${file.date} 到期 ｜ ${file.sourceDays} 個交易日</option>`
-      ).join("");
+      state.dateFiles = data.files;
+      renderDateSelectors();
       ui.period.innerHTML = state.periods.map((period) =>
         `<option value="${period}" ${period === state.period ? "selected" : ""}>${period.toUpperCase()}</option>`
       ).join("");
@@ -1672,6 +1697,10 @@
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
 
+    for (const control of [ui.fileYear, ui.fileMonth]) control.addEventListener('change', () => {
+      renderDateSelectors({ year: ui.fileYear.value, month: ui.fileMonth.value });
+      if (ui.file.value && ui.file.value !== state.file) ui.file.dispatchEvent(new Event('change'));
+    });
     ui.file.addEventListener("change", async () => {
       state.file = ui.file.value;
       state.selected = "";
