@@ -273,8 +273,10 @@ async function getBtcKlines(fileName, symbol, period, signal) {
   const optionStart = Math.min(...times);
   const optionEnd = Math.max(...times) + periodMinutes(selected.interval) * 60000;
   const bucket = periodMinutes(selectedPeriod) * 60000;
-  const start = Math.floor(optionStart / bucket) * bucket;
-  const end = Math.ceil(optionEnd / bucket) * bucket;
+  const fullOnlineRange = /\.github\.io$/i.test(location.hostname);
+  const expiryEnd = Date.parse(reference.expiryDate + 'T16:00:00+08:00');
+  const start = fullOnlineRange ? expiryEnd - 3 * 86400000 : Math.floor(optionStart / bucket) * bucket;
+  const end = fullOnlineRange ? expiryEnd : Math.ceil(optionEnd / bucket) * bucket;
   if (start >= Date.now()) throw new Error("此契約對應時間尚未到來，無法取得 BTC/USD 歷史 K 線");
   const sourceInterval = selectedPeriod === "15m" ? "15m" : "1h";
   const granularity = periodMinutes(sourceInterval) * 60;

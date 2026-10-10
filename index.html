@@ -630,6 +630,7 @@
             <select id="fileMonth" aria-label="到期月份"></select>
             <select id="fileSelect" aria-label="到期日期"></select>
           </div>
+          <div id="chosenExpiryLabel" hidden style="margin-top:6px;font-size:12px;color:var(--cyan)"></div>
         </div>
         <div class="field">
           <label for="periodSelect">K 線週期</label>
@@ -804,6 +805,9 @@
       try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ file, period, selected, expiry, mode, favorites, autoRefresh, indicators, view, compare, datasetMode:state.datasetMode })); } catch {}
     }
 
+    const ONLINE_ONLY = /\.github\.io$/i.test(location.hostname);
+    const expiryLabel = date => ONLINE_ONLY && /^\d{4}-\d{2}-\d{2}$/.test(date || '')
+      ? date + '（' + ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'][new Date(date + 'T12:00:00Z').getUTCDay()] + '）' : date;
     const $ = (id) => document.getElementById(id);
     const ui = {
       file: $("fileSelect"),
@@ -918,13 +922,16 @@
       ui.fileMonth.innerHTML = months.map(value => '<option value="' + value + '">' + Number(value) + ' 月</option>').join('');
       ui.fileMonth.value = month || '';
       const dates = files.filter(file => file.date.startsWith(year + '-' + month + '-')).sort((a, b) => a.date.localeCompare(b.date));
-      ui.file.innerHTML = dates.map(file => '<option value="' + esc(file.name) + '">' + Number(file.date.slice(8, 10)) + ' 日</option>').join('');
+      ui.file.innerHTML = dates.map(file => '<option value="' + esc(file.name) + '">' + Number(file.date.slice(8, 10)) + ' 日' + (ONLINE_ONLY ? ' · ' + expiryLabel(file.date).split('（')[1].replace('）','') : '') + '</option>').join('');
       const selected = dates.find(file => file.name === state.file) || dates.find(file => file.date.slice(8, 10) === current?.date.slice(8, 10)) || dates[0];
       ui.file.value = selected?.name || '';
+      $('chosenExpiryLabel').hidden = !ONLINE_ONLY || !selected;
+      $('chosenExpiryLabel').textContent = selected ? expiryLabel(selected.date) : '';
       for (const control of [ui.fileYear, ui.fileMonth, ui.file]) control.disabled = !files.length;
     }
 
     async function loadMeta({ preserveFile = false, preserveView = false } = {}) {
+      if (ONLINE_ONLY && !preserveView) { state.view = 'btc'; state.compare = false; updateCompareMode(); }
       const request = beginRequest();
       state.metaBusy = true;
       if (!preserveView) clearChart();
@@ -1024,6 +1031,7 @@
       if (state.metaBusy) return;
       if (state.compare) view = "option";
       preserveView = preserveView && state.rows.length > 0 && state.view === view && state.selected === symbol;
+      if (ONLINE_ONLY && view === 'btc') { preserveView = false; state.indicators.finalSession = true; const toggle = document.querySelector('[data-indicator="finalSession"]'); toggle.classList.add('active'); toggle.setAttribute('aria-pressed','true'); }
       const request = beginRequest();
       const oldStart = state.start;
       const oldVisible = state.visible;
@@ -1075,9 +1083,9 @@
       $("symbolTitle").textContent = isBtc ? "BTC / USD" : state.selected;
       $("chartKind").textContent = isBtc ? "BTC 現貨 · 技術分析" : (state.datasetMode === "data1" ? "幣安成交 K 線" : "期權標記價格 K 線");
       $("volumeLabel").textContent = isBtc ? "成交量（BTC）" : "成交量";
-      $("symbolMeta").textContent = `到期 ${info.expiryDate} ｜ 履約價 ${fmt(info.strikePrice, 0)} ｜ ${isBtc ? "對應時段 BTC 現貨" : info.side} ｜ ${data.period.toUpperCase()}${data.period !== data.sourceInterval ? `（由 ${data.sourceInterval} 聚合）` : ""}`;
+      $("symbolMeta").textContent = `到期 ${expiryLabel(info.expiryDate)} ｜ 履約價 ${fmt(info.strikePrice, 0)} ｜ ${isBtc ? "對應時段 BTC 現貨" : info.side} ｜ ${data.period.toUpperCase()}${data.period !== data.sourceInterval ? `（由 ${data.sourceInterval} 聚合）` : ""}`;
       $("sourceInfo").textContent = isBtc
-        ? `${data.provider} · 契約資料 ${data.range.optionStart} ～ ${data.range.optionEnd} · 台北時間${data.missingSourceBars ? ` · 來源缺少 ${data.missingSourceBars} 根 K 棒` : ""}`
+        ? `${data.provider} · ${ONLINE_ONLY ? "前兩日＋最後 24h" : "契約資料"} ${ONLINE_ONLY ? data.range.start : data.range.optionStart} ～ ${ONLINE_ONLY ? data.range.end : data.range.optionEnd} · 台北時間${data.missingSourceBars ? ` · 來源缺少 ${data.missingSourceBars} 根 K 棒` : ""}`
         : `${state.datasetMode === "data1" ? "幣安成交" : "標記價格"} · 到期日 ${data.file.date} · 前兩天＋當天 ${data.file.firstDate} ～ ${data.file.lastDate} · 檔案更新 ${new Date(data.file.modifiedAt).toLocaleString("zh-TW", { hour12: false, timeZone: "Asia/Taipei" })} · 台北時間${data.file.missingDates?.length ? ` · 缺來源 ${data.file.missingDates.join("、")}` : ""}`;
       $("lastPrice").textContent = fmt(last.close);
       $("lastPrice").style.color = change >= 0 ? "var(--up)" : "var(--down)";
@@ -1718,6 +1726,7 @@
     }
 
     function defaultVisible() {
+      if (ONLINE_ONLY && state.view === 'btc') return state.rows.length;
       return Math.max(15, Math.min(80, Math.floor((ui.chart.clientWidth - 84) / 11)));
     }
 
