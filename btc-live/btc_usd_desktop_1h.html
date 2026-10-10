@@ -716,7 +716,7 @@
     </section>
     <section class="range-summary" aria-label="24 小時標記區間統計">
       <h2>24 小時統計</h2>
-      <div class="range-period" style="color:#b99aff">首棒範圍 ≥200 點（紫色虛線）<br><span id="openingRangeInfo">--</span></div>
+      <div class="range-period" style="color:#b99aff">首棒高低範圍（紫色漸層）／基準線（白色）<br><span id="openingRangeInfo">--</span></div>
       <div id="rangeStatsPeriod" class="range-period">--</div>
       <dl>
         <dt>開盤價</dt><dd><span id="rangeStatsOpen">--</span><small id="rangeStatsOpenCompare" style="display:block;max-width:190px;margin-top:6px;color:var(--yellow);font-size:12px;line-height:1.6;white-space:normal">--</small></dd>
@@ -757,7 +757,7 @@
         <span class="item">振幅 <b id="ciAmp">--</b></span>
         <span class="item">量 <b id="ciVol">--</b></span>
       </div>
-      <div id="optionMark0" class="option-mark" hidden></div><div id="optionMark1" class="option-mark" hidden></div><div id="optionMark2" class="option-mark" hidden></div><div id="optionMark3" class="option-mark" hidden></div><div id="openingRangeFill" aria-hidden="true"></div>
+      <div id="optionMark0" class="option-mark" hidden></div><div id="optionMark1" class="option-mark" hidden></div><div id="optionMark2" class="option-mark" hidden></div><div id="optionMark3" class="option-mark" hidden></div><div id="optionMark4" class="option-mark" hidden></div><div id="optionMark5" class="option-mark" hidden></div><div id="openingRangeFill" aria-hidden="true"></div>
       <div id="rangeOverlay"><div class="range-label">最後 24 小時</div></div>
       <div id="loading"><div class="spinner"></div><span>抓取 BTC 1H K 線…</span></div>
       <div id="errorBox"></div>
@@ -1343,7 +1343,7 @@
     const symbol=button.dataset.optionSymbol||(preferredOptionSide==='PUT'?button.dataset.optionPut:button.dataset.optionCall)||button.dataset.optionCall||button.dataset.optionPut;
     if(symbol)openOptionAnalysis(symbol);
   });
-  for(let index=0;index<4;index++){
+  for(let index=0;index<6;index++){
     const mark=document.getElementById('optionMark'+index);
     const open=()=>{if(mark.dataset.optionSymbol)openOptionAnalysis(mark.dataset.optionSymbol);};
     mark.addEventListener('click',open);mark.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();open();}});
@@ -1370,15 +1370,16 @@
       const contract=nearestOption(boundary,currentEndMs,optionContracts);
       const matches=entry && contract && entry.symbol===contract.symbol && entry.expiry===currentEndMs;
       el.hidden=!liveMode || y==null || y<0 || y>chartWrap.clientHeight-28;
-      el.textContent=matches ? fmtPrice(entry.price) : '--';
+      el.textContent=(boundary.baseline ? (boundary.side==='CALL'?'C ':'P ') : '') + (matches ? fmtPrice(entry.price) : '--');
+      el.title=contract ? contract.symbol+'｜標記價格（非成交價）' : '尚無對應到期日契約';
       el.dataset.optionSymbol=matches?entry.symbol:'';
       el.setAttribute('role','button');el.tabIndex=matches?0:-1;
       el.setAttribute('aria-label',matches?'幣安 '+entry.symbol+' 標記價格 '+fmtPrice(entry.price)+'，查看 Bybit 技術分析':'等待期權價格');
-      el.style.color=index<2?'#f4ce3a':'#4dabf7';
+      el.style.color=boundary.baseline?'#ffffff':index<2?'#f4ce3a':'#4dabf7';
       el.style.left=Math.max(14,chartWrap.clientWidth-240)+'px';
       el.style.top=(boundary.side==='CALL'?Math.max(0,y-30):y+6)+'px';
     });
-    for(let index=optionBoundaries.length;index<4;index++)document.getElementById('optionMark'+index).hidden=true;
+    for(let index=optionBoundaries.length;index<6;index++)document.getElementById('optionMark'+index).hidden=true;
   }
   function stopOnlineOptions() {
     const socket = optionSocket; optionSocket = null;
@@ -1485,24 +1486,30 @@
     }); });
     positionOptionMarks();
   }
+  const openingBaseline = chart.addLineSeries({color:'#ffffff',lineWidth:2,lineStyle:LightweightCharts.LineStyle.Solid,title:'基準線',priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:false});
   function updateOpeningRange(bars) {
     const ordered = [...bars].sort((a,b) => a.time - b.time);
-    const first = ordered.find(bar => Number.isFinite(bar.high) && Number.isFinite(bar.low) && bar.high - bar.low >= 200);
-    if (!first) {
+    const first = ordered[0];
+    if (!first || !Number.isFinite(first.high) || !Number.isFinite(first.low)) {
+      openingBaseline.setData([]);
       openingRangeBounds = null;
       updateOpeningRangeFill();
       openingRangeHigh.setData([]);
       openingRangeLow.setData([]);
-      document.getElementById('openingRangeInfo').textContent = bars.length ? '24h 內沒有高低差至少 200 點的 K 線' : '--';
+      document.getElementById('openingRangeInfo').textContent = bars.length ? '首棒高低價資料不完整' : '--';
       return;
     }
     const step = {'15m':900,'1h':3600,'4h':14400}[selectedInterval];
-    const endTime = Math.max(first.time + step, ordered[ordered.length - 1].time);
+    const endTime = Math.max(first.time + step, Math.floor(currentEndMs / 1000));
+    const midpoint = (first.high + first.low) / 2;
+    openingBaseline.setData([{time:first.time,value:midpoint},{time:endTime,value:midpoint}]);
+    optionBoundaries.push({price:midpoint,title:'基準線',side:'CALL',baseline:true},{price:midpoint,title:'基準線',side:'PUT',baseline:true});
+    positionOptionMarks();
     openingRangeBounds = {start:first.time,end:endTime,high:first.high,low:first.low};
     requestAnimationFrame(updateOpeningRangeFill);
     openingRangeHigh.setData([{time:first.time,value:first.high},{time:endTime,value:first.high}]);
     openingRangeLow.setData([{time:first.time,value:first.low},{time:endTime,value:first.low}]);
-    document.getElementById('openingRangeInfo').textContent = '基準 ' + fmtFull(first.openTime) + ' ｜高 ' + fmtPrice(first.high) + ' ｜低 ' + fmtPrice(first.low) + ' ｜高低差 ' + fmtPrice(first.high-first.low);
+    document.getElementById('openingRangeInfo').textContent = '首棒 ' + fmtFull(first.openTime) + ' ｜高 ' + fmtPrice(first.high) + ' ｜低 ' + fmtPrice(first.low) + ' ｜高低差 ' + fmtPrice(first.high-first.low) + ' ｜基準線 ' + fmtPrice(midpoint);
   }
 
   function updateRangeStats(bars) {
