@@ -717,6 +717,7 @@
     <section class="range-summary" aria-label="24 小時標記區間統計">
       <h2>24 小時統計</h2>
       <div class="range-period" style="color:#b99aff">首棒高低範圍（紫色漸層）／基準線（白色）<br><span id="openingRangeInfo">--</span></div>
+      <div class="range-period" id="dynamicRangeInfo">--</div>
       <div id="rangeStatsPeriod" class="range-period">--</div>
       <dl>
         <dt>開盤價</dt><dd><span id="rangeStatsOpen">--</span><small id="rangeStatsOpenCompare" style="display:block;max-width:190px;margin-top:6px;color:var(--yellow);font-size:12px;line-height:1.6;white-space:normal">--</small></dd>
@@ -1463,17 +1464,61 @@
   for(const event of ['pointermove','pointerup','wheel'])chartWrap.addEventListener(event,()=>requestAnimationFrame(positionOptionMarks),{passive:true});
   chart.timeScale().subscribeVisibleLogicalRangeChange(positionOptionMarks);
 
-  function updateIdealRange(firstBar) {
+  function historicalRange(bars, endMs, interval) {
+    const step = {'15m':900000,'1h':3600000,'4h':14400000}[interval];
+    const day = 24 * HOUR, start = endMs - day;
+    const days = [];
+    for (let ago = 2; ago >= 1; ago--) {
+      const from = start - ago * day;
+      const rows = bars.filter(b => b.openTime >= from && b.openTime < from + day).sort((a,b) => a.openTime-b.openTime);
+      if (rows.length !== day / step || rows.some((b,i) => b.openTime !== from + i*step || !Number.isFinite(b.high) || !Number.isFinite(b.low) || b.high < b.low)) return null;
+      const base = (rows[0].high + rows[0].low) / 2;
+      if (!(base > 0)) return null;
+      const later = rows.slice(1);
+      const up = Math.max(0, (Math.max(...later.map(b=>b.high))-base)/base*100);
+      const down = Math.max(0, (base-Math.min(...later.map(b=>b.low)))/base*100);
+      days.push({from,base,up,down});
+    }
+    const maxPct = Math.max(...days.flatMap(d=>[d.up,d.down]));
+    const outerPct = Math.ceil(Number((maxPct / 0.5).toFixed(10))) * 0.5;
+    return {days,maxPct,outerPct,innerPct:outerPct/2};
+  }
+
+  function updateIdealRange(firstBar, bars = []) {
     for (const line of idealRangeLines) candleSeries.removePriceLine(line);
     idealRangeLines = [];
     optionBoundaries = [];
+    const info = document.getElementById('dynamicRangeInfo');
+    info.textContent = '--';
     if (!firstBar || !Number.isFinite(firstBar.open)) { positionOptionMarks(); return; }
-    idealRangeLines = [
+    let boundaries;
+    if (!liveMode) {
+      const range = historicalRange(bars,currentEndMs,selectedInterval);
+      if (!range || !Number.isFinite(firstBar.high) || !Number.isFinite(firstBar.low)) {
+        info.textContent = '前兩個完整契約日資料不足，暫不顯示動態範圍';
+        positionOptionMarks(); return;
+      }
+      const base = (firstBar.high + firstBar.low) / 2;
+      const outer = base * range.outerPct / 100, inner = base * range.innerPct / 100;
+      const pct = value => String(Number(value.toFixed(4))) + '%';
+      info.textContent = '前兩日最大幅度 ' + range.maxPct.toFixed(4) + '% ｜理想 ±' + pct(range.outerPct) + ' ｜現實 ±' + pct(range.innerPct) + '（首棒收盤後固定）';
+      info.title = range.days.map(d => fmtFull(d.from) + '：上漲 ' + d.up.toFixed(4) + '%／下跌 ' + d.down.toFixed(4) + '%').join('\n');
+      boundaries = [
+        {price:base+outer,title:'理想範圍 上限 +' + pct(range.outerPct)},
+        {price:base-outer,title:'理想範圍 下限 −' + pct(range.outerPct)},
+        {price:base+inner,title:'現實範圍 上限 +' + pct(range.innerPct),color:'rgba(77,171,247,0.30)',labelColor:'#294b66'},
+        {price:base-inner,title:'現實範圍 下限 −' + pct(range.innerPct),color:'rgba(77,171,247,0.30)',labelColor:'#294b66'}
+      ];
+    } else {
+      info.textContent = '即時模式：理想 ±2,000／現實 ±1,000 點';
+      boundaries = [
       {price:firstBar.open + 2000, title:'理想範圍 上限 +2,000'},
       {price:firstBar.open - 2000, title:'理想範圍 下限 −2,000'},
       {price:firstBar.open + 1000, title:'現實範圍 上限 +1,000', color:'rgba(77,171,247,0.30)', labelColor:'#294b66'},
       {price:firstBar.open - 1000, title:'現實範圍 下限 −1,000', color:'rgba(77,171,247,0.30)', labelColor:'#294b66'}
-    ].map((boundary,index) => { optionBoundaries.push({...boundary,side:index % 2 === 0 ? "CALL" : "PUT"}); return candleSeries.createPriceLine({
+      ];
+    }
+    idealRangeLines = boundaries.map((boundary,index) => { optionBoundaries.push({...boundary,side:index % 2 === 0 ? "CALL" : "PUT"}); return candleSeries.createPriceLine({
       price:boundary.price,
       title:boundary.title,
       color:boundary.color || 'rgba(244,206,58,0.30)',
@@ -1515,7 +1560,7 @@
   function updateRangeStats(bars) {
     const start = currentEndMs - RANGE_HOURS * HOUR;
     const selected = bars.filter(bar => bar.openTime >= start && bar.openTime < currentEndMs);
-    updateIdealRange(selected[0]);
+    updateIdealRange(selected[0], bars);
     updateOpeningRange(selected);
     document.getElementById('rangeStatsPeriod').textContent = `${fmtFull(start)} → ${fmtFull(currentEndMs)}（台灣時間）`;
     const values = {Open:'--',OpenCompare:'--',Close:'--',High:'--',Low:'--',Diff:'--',Amp:'--'};
