@@ -677,6 +677,7 @@
 
     <nav class="tabs">
       <div id="priceTab" class="tab active" role="tab" tabindex="0" aria-selected="true">價格</div>
+      <button id="dvolTab" class="tab" role="tab" aria-selected="false" style="border:0;background:transparent;color:inherit;cursor:pointer">DVOL</button>
       <button id="optionChainTab" class="tab" role="tab" aria-selected="false" hidden>期權鏈</button>
       <div class="tab">資訊</div>
       <div class="tab">交易數據</div>
@@ -1022,7 +1023,45 @@
     errorBox.style.display = 'none';
   }
 
+  let dvolMode=false;
+  const dvolCache=new Map();
+  async function fetchDvolKlines(startMs,endMs){
+    const interval=selectedInterval,step=interval==='15m'?900000:interval==='4h'?14400000:3600000;
+    const sourceStep=interval==='15m'?60000:3600000,resolution=String(sourceStep/1000);
+    const key=startMs+':'+interval+':'+Math.floor(endMs/3600000),cached=dvolCache.get(key);
+    if(cached&&Date.now()-cached.at<(liveMode?5000:3600000))return cached.rows;
+    const samples=new Map();
+    for(let cursor=startMs;cursor<endMs;cursor+=sourceStep*500){
+      const stop=Math.min(endMs,cursor+sourceStep*500);
+      const url='https://www.deribit.com/api/v2/public/get_volatility_index_data?'+new URLSearchParams({currency:'BTC',resolution,start_timestamp:String(cursor),end_timestamp:String(stop-1)});
+      const response=await fetch(url,{signal:AbortSignal.timeout(15000)});
+      if(!response.ok)throw Error('Deribit HTTP '+response.status);
+      const data=await response.json();if(data.error)throw Error(data.error.message||'DVOL API 錯誤');
+      if(!Array.isArray(data.result?.data))throw Error('DVOL 資料格式錯誤');
+      for(const row of data.result.data)if(row.length>=5&&row.slice(0,5).every(Number.isFinite)&&row[0]>=startMs&&row[0]<endMs)samples.set(row[0],row);
+    }
+    if(!samples.size)throw Error(interval==='15m'?'此日期沒有 DVOL 分鐘歷史資料，請切換 1 小時或 4 小時':'此日期沒有 DVOL 歷史資料（指數自 2021 年起提供）');
+    const groups=new Map();
+    for(const row of [...samples.values()].sort((a,b)=>a[0]-b[0])){
+      const time=Math.floor(row[0]/step)*step;
+      if(!groups.has(time))groups.set(time,[time,row[1],row[2],row[3],row[4],0]);
+      else{const bar=groups.get(time);bar[2]=Math.max(bar[2],row[2]);bar[3]=Math.min(bar[3],row[3]);bar[4]=row[4];}
+    }
+    const rows=[...groups.values()];dvolCache.set(key,{at:Date.now(),rows});while(dvolCache.size>12)dvolCache.delete(dvolCache.keys().next().value);return rows;
+  }
+  function setDvolMode(active){
+    dvolMode=active;
+    document.getElementById('dvolTab').classList.toggle('active',active);
+    document.getElementById('dvolTab').setAttribute('aria-selected',String(active));
+    document.getElementById('priceTab').classList.toggle('active',!active&&!optionChainVisible);
+    document.getElementById('priceTab').setAttribute('aria-selected',String(!active&&!optionChainVisible));
+    document.querySelector('.symbol').textContent=active?'BTC DVOL':'BTC / USD';
+    document.querySelector('.subsymbol').textContent=active?'Deribit · 30 日預期年化波動率（%）':'Binance BTCUSDT · 現貨歷史行情';
+    candleSeries.applyOptions({priceFormat:{type:'custom',minMove:.01,formatter:value=>fmtPrice(value)+(dvolMode?'%':'')}});
+    optionValues.clear();positionOptionMarks();
+  }
   async function fetchKlines(startMs, endMs) {
+    if(dvolMode)return fetchDvolKlines(startMs,endMs);
     const params = new URLSearchParams({
       symbol:'BTCUSDT',
       interval:selectedInterval,
@@ -1113,7 +1152,7 @@
     ciHigh.textContent = fmtPrice(bar.high);
     ciLow.textContent = fmtPrice(bar.low);
     ciClose.textContent = fmtPrice(bar.close);
-    ciVol.textContent = fmtVolume(bar.volume);
+    ciVol.textContent = dvolMode?'不適用':fmtVolume(bar.volume);
 
     const change = bar.open ? ((bar.close / bar.open) - 1) * 100 : 0;
     const amp = bar.open ? ((bar.high - bar.low) / bar.open) * 100 : 0;
@@ -1166,7 +1205,7 @@
   let optionChainVisible = false;
   const allOptionMarks = new Map();
   function setOptionChainView(show) {
-    if(show)closeOptionAnalysis();
+    if(show){closeOptionAnalysis();if(dvolMode){setDvolMode(false);loadSelectedDate();}}
     optionChainVisible = show && liveMode;
     document.querySelector('.app').classList.toggle('chain-mode',optionChainVisible);
     document.getElementById('optionChainPanel').hidden = !optionChainVisible;
@@ -1177,8 +1216,9 @@
     if(optionChainVisible)renderOptionChain();
   }
   document.getElementById('optionChainTab').addEventListener('click',()=>setOptionChainView(true));
-  document.getElementById('priceTab').addEventListener('click',()=>setOptionChainView(false));
-  document.getElementById('priceTab').addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();setOptionChainView(false);}});
+  document.getElementById('dvolTab').addEventListener('click',()=>{closeOptionAnalysis();setOptionChainView(false);setDvolMode(true);loadSelectedDate();});
+  document.getElementById('priceTab').addEventListener('click',()=>{const reload=dvolMode;setDvolMode(false);setOptionChainView(false);if(reload)loadSelectedDate();});
+  document.getElementById('priceTab').addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('priceTab').click();}});
   document.getElementById('optionChainExpiry').addEventListener('change',renderOptionChain);
   function renderOptionChain() {
     if(!optionChainVisible)return;
@@ -1342,6 +1382,7 @@
   }
   async function openOptionAnalysis(binanceSymbol){
     if(!liveMode)return;
+    if(dvolMode){setDvolMode(false);loadSelectedDate();}
     const contract=optionContracts.find(item=>item.symbol===binanceSymbol);if(!contract)return;
     analysisExpiry=Number(contract.expiryDate);preferredOptionSide=contract.side;selectedBinanceSymbol=binanceSymbol;
     document.querySelectorAll('[data-analysis-side]').forEach(button=>button.classList.toggle('active',button.dataset.analysisSide===contract.side));
@@ -1393,7 +1434,7 @@
       const entry=optionValues.get(index), y=candleSeries.priceToCoordinate(boundary.price);
       const contract=nearestOption(boundary,currentEndMs,optionContracts);
       const matches=entry && contract && entry.symbol===contract.symbol && entry.expiry===currentEndMs;
-      el.hidden=!liveMode || y==null || y<0 || y>chartWrap.clientHeight-28;
+      el.hidden=dvolMode || !liveMode || y==null || y<0 || y>chartWrap.clientHeight-28;
       el.textContent=(boundary.baseline ? (boundary.side==='CALL'?'C ':'P ') : '') + (matches ? fmtPrice(entry.price) : '--');
       el.title=contract ? contract.symbol+'｜標記價格（非成交價）' : '尚無對應到期日契約';
       el.dataset.optionSymbol=matches?entry.symbol:'';
@@ -1457,7 +1498,7 @@
   }
 
   async function refreshOptionMarks() {
-    if(!liveMode || optionBusy || document.hidden)return;
+    if(dvolMode || !liveMode || optionBusy || document.hidden)return;
     if(onlineOptions){ refreshOnlineOptions(); return; }
     optionBusy=true;const epoch=optionEpoch;
     try {
@@ -1608,7 +1649,7 @@
     const vol24 = last24.reduce((s,b)=>s+b.volume,0);
 
     const pct = first.close ? ((last.close / first.close) - 1) * 100 : 0;
-    lastPriceEl.textContent = fmtPrice(last.close);
+    lastPriceEl.textContent = fmtPrice(last.close)+(dvolMode?'%':'');
     lastTimeEl.textContent = `台灣時間 ${fmtFull(last.openTime)}`;
     changePctEl.textContent = `${pct>=0?'+':''}${pct.toFixed(2)}%`;
     lastPriceEl.classList.toggle('down', pct < 0);
@@ -1616,7 +1657,7 @@
 
     high24El.textContent = fmtPrice(high24);
     low24El.textContent = fmtPrice(low24);
-    vol24El.textContent = fmtVolume(vol24);
+    vol24El.textContent = dvolMode?'不適用':fmtVolume(vol24);
 
     const d7 = maData(bars,7);
     const d25 = maData(bars,25);
@@ -1637,7 +1678,7 @@
     }));
 
     candleSeries.setData(candles);
-    volumeSeries.setData(volumes);
+    volumeSeries.setData(dvolMode?[]:volumes);
     ma7Series.setData(maData(bars,7));
     ma25Series.setData(maData(bars,25));
     ma99Series.setData(maData(bars,99));
@@ -1660,7 +1701,7 @@
 
     hideError();
     if (!background) loading.style.display = 'flex';
-    setState('','連線 Binance API…');
+    setState('',dvolMode?'連線 Deribit DVOL API…':'連線 Binance API…');
 
     const end = liveMode ? new Date() : taipei16(dateStr);
     const endMs = end.getTime();
@@ -1694,7 +1735,7 @@
       updateSummary(bars);
       if(liveMode)refreshOptionMarks();
       barCount.textContent = `${bars.length} 根 K`;
-      setState('ok','Binance API · BTCUSDT' + (liveMode ? ' · 即時' : ''));
+      setState('ok',(dvolMode?'Deribit API · BTC DVOL':'Binance API · BTCUSDT') + (liveMode ? ' · 即時' : ''));
       if (liveMode) document.getElementById('liveStatus').textContent = '契約日 ' + contractDate + ' · 每 1 秒更新 · 更新於 ' + fmtFull(Date.now()) + ' · 末根尚未收盤';
     } catch (err) {
       if (requestVersion !== loadVersion) return;
