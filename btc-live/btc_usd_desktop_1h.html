@@ -656,6 +656,8 @@
 #optionAnalysisStatus{line-height:1.6;}[data-analysis-side].active{background:rgba(244,206,58,.1);}
 @media(max-width:600px){#optionAnalysisPanel{min-height:500px;height:68dvh;}#optionAnalysisInfo{padding:6px 8px;font-size:11px;}.analysis-periods{gap:5px;padding:8px;}.analysis-periods>span{flex-basis:100%;font-size:12px;color:#b9c7d9;}.analysis-inline-row{gap:10px;}}
 
+#analysisOpeningFill{position:absolute;pointer-events:none;z-index:3;background:linear-gradient(180deg,rgba(157,123,255,.18),rgba(157,123,255,.32),rgba(157,123,255,.18));border-top:1px solid rgba(185,154,255,.55);border-bottom:1px solid rgba(185,154,255,.55);}
+#analysisOpeningFill[hidden]{display:none;}
 #analysis24Range{position:absolute;top:0;z-index:2;pointer-events:none;background:rgba(244,206,58,.075);border-left:1px dashed rgba(244,206,58,.65);border-right:1px dashed rgba(244,206,58,.65);overflow:hidden;}
 #analysis24Range[hidden]{display:none;}#analysis24Range>span{position:absolute;top:8px;left:8px;color:#f4ce3a;background:rgba(16,23,34,.85);border-radius:4px;padding:3px 7px;font-size:12px;white-space:nowrap;}
 </style></head>
@@ -767,7 +769,7 @@
     <section id="optionAnalysisPanel" hidden aria-label="Bybit 期權標記價格技術分析">
       <div class="analysis-head"><strong id="optionAnalysisTitle">Bybit 期權技術分析</strong><button id="returnSpotBtn">返回 BTC 現貨</button></div>
       <div class="analysis-periods"><span>Bybit 標記價格</span><button data-analysis-side="CALL" class="active">CALL</button><button data-analysis-side="PUT">PUT</button><button data-option-interval="15">15分</button><button data-option-interval="60" class="active">1小時</button><button data-option-interval="240">4小時</button></div>
-      <div id="optionAnalysisInfo">開 --　高 --　低 --　收 --</div><div id="optionAnalysisChart"><div id="analysis24Range" hidden><span>最後 24 小時</span></div></div><div id="optionAnalysisStatus" role="status">等待契約資料…</div>
+      <div id="optionAnalysisInfo">開 --　高 --　低 --　收 --</div><div id="optionAnalysisChart"><div id="analysisOpeningFill" hidden></div><div id="analysis24Range" hidden><span>最後 24 小時</span></div></div><div id="optionAnalysisStatus" role="status">等待契約資料…</div>
     </section>
 
     <section id="optionChainPanel" hidden aria-label="即時 BTC 期權鏈">
@@ -1223,7 +1225,7 @@
   let analysisExpiry=0;
   let analysisVisible=false,analysisSymbol='',analysisInterval='60',analysisVersion=0,analysisBusy=false;
   let bybitContracts=[],bybitContractsAt=0,bybitPending=null,analysisBars=[];
-  let analysisChart=null,analysisCandle=null,analysisMAs=[];
+  let analysisChart=null,analysisCandle=null,analysisMAs=[],analysisOpeningLines=[];
   const analysisPanel=document.getElementById('optionAnalysisPanel');
   const analysisStatus=document.getElementById('optionAnalysisStatus');
   async function bybitGet(path,params){
@@ -1249,9 +1251,11 @@
     const host=document.getElementById('optionAnalysisChart');
     analysisChart=LightweightCharts.createChart(host,{layout:{background:{color:'#101722'},textColor:'#9aa9bb'},grid:{vertLines:{color:'#263140'},horzLines:{color:'#263140'}},rightPriceScale:{borderColor:'#303c4c'},timeScale:{timeVisible:true,borderColor:'#303c4c',tickMarkFormatter:time=>fmtMDHM(Number(time)*1000)},localization:{priceFormatter:fmtPrice,timeFormatter:time=>fmtFull(Number(time)*1000)}});
     analysisCandle=analysisChart.addCandlestickSeries({upColor:'#29c39a',downColor:'#f64e66',borderVisible:false,wickUpColor:'#29c39a',wickDownColor:'#f64e66',priceFormat:{type:'price',precision:4,minMove:.0001}});
+    analysisOpeningLines=['rgba(157,123,255,.55)','rgba(157,123,255,.55)','#ffffff'].map((color,i)=>analysisChart.addLineSeries({color,lineWidth:2,lineStyle:i===2?LightweightCharts.LineStyle.Solid:LightweightCharts.LineStyle.Dashed,title:i===2?'基準線':'',priceLineVisible:false,lastValueVisible:i===2,crosshairMarkerVisible:false}));
     analysisMAs=[7,25,99].map((period,i)=>({period,series:analysisChart.addLineSeries({color:['#f4ce3a','#e86cad','#8b79dd'][i],lineWidth:1,priceLineVisible:false,lastValueVisible:false})}));
     new ResizeObserver(()=>{const range=analysisChart.timeScale().getVisibleLogicalRange();analysisChart.resize(host.clientWidth,host.clientHeight);if(range)analysisChart.timeScale().setVisibleLogicalRange(range);updateAnalysis24Range();}).observe(host);
     analysisChart.timeScale().subscribeVisibleLogicalRangeChange(updateAnalysis24Range);
+    for(const event of ['pointermove','pointerup','wheel'])host.addEventListener(event,()=>requestAnimationFrame(updateAnalysis24Range),{passive:true});
     analysisChart.subscribeCrosshairMove(event=>{
       if(event.time){const bar=event.seriesData.get(analysisCandle);if(bar)showAnalysisInfo(bar);}
       else if(analysisBars.length)showAnalysisInfo(analysisBars[analysisBars.length-1]);
@@ -1268,7 +1272,26 @@
     const stamp=new Date(bar.time*1000+8*3600000).toISOString().slice(0,16).replace('T',' ').replace(/-/g,'/');
     document.getElementById('optionAnalysisInfo').innerHTML='<div class="analysis-inline-row"><time>'+stamp+'</time>'+values+'</div><div class="analysis-averages">'+averages+'</div>';
   }
+  function updateAnalysisOpeningRange(updateSeries=false){
+    const fill=document.getElementById('analysisOpeningFill');
+    if(!analysisChart||!analysisBars.length||!analysisExpiry){fill.hidden=true;return;}
+    const start=analysisExpiry/1000-24*3600,end=analysisExpiry/1000;
+    const first=analysisBars.find(b=>b.time>=start&&b.time<end);
+    if(!first){if(updateSeries)analysisOpeningLines.forEach(line=>line.setData([]));fill.hidden=true;return;}
+    const last=analysisBars[analysisBars.length-1],mid=(first.high+first.low)/2;
+    if(updateSeries)[first.high,first.low,mid].forEach((value,i)=>analysisOpeningLines[i].setData(last.time>first.time?[{time:first.time,value},{time:last.time,value}]:[{time:first.time,value}]));
+    const scale=analysisChart.timeScale(),step=Number(analysisInterval)*60;
+    const index=analysisBars.indexOf(first),lastIndex=analysisBars.length-1;
+    const x1=scale.logicalToCoordinate(index),x2=scale.logicalToCoordinate(lastIndex+(end-last.time)/step);
+    const y1=analysisCandle.priceToCoordinate(first.high),y2=analysisCandle.priceToCoordinate(first.low);
+    const host=document.getElementById('optionAnalysisChart'),width=host.clientWidth-analysisChart.priceScale('right').width(),height=host.clientHeight-scale.height();
+    if([x1,x2,y1,y2].some(v=>v==null)){fill.hidden=true;return;}
+    const left=Math.max(0,x1),right=Math.min(width,x2),top=Math.max(0,Math.min(y1,y2)),bottom=Math.min(height,Math.max(y1,y2));
+    fill.hidden=right<=left||bottom<=top;fill.style.left=left+'px';fill.style.top=top+'px';fill.style.width=Math.max(0,right-left)+'px';fill.style.height=Math.max(0,bottom-top)+'px';
+    fill.title='首棒高低範圍：'+fmtPrice(first.high)+'／'+fmtPrice(first.low)+' · 基準線 '+fmtPrice(mid);
+  }
   function updateAnalysis24Range(){
+    updateAnalysisOpeningRange();
     const overlay=document.getElementById('analysis24Range');
     if(!analysisChart||!analysisBars.length||!analysisExpiry){overlay.hidden=true;return;}
     const scale=analysisChart.timeScale(),step=Number(analysisInterval)*60;
@@ -1306,7 +1329,7 @@
       const result=await bybitGet('mark-price-kline',{category:'option',symbol,interval,limit:'500'});
       if(version!==analysisVersion)return;
       const bars=(result.list||[]).map(k=>({time:Math.floor(Number(k[0])/1000),open:Number(k[1]),high:Number(k[2]),low:Number(k[3]),close:Number(k[4])})).filter(b=>[b.time,b.open,b.high,b.low,b.close].every(Number.isFinite)).sort((a,b)=>a.time-b.time);
-      analysisBars=bars;analysisCandle.setData(bars);updateAnalysisExtremes(bars);analysisMAs.forEach(({period,series})=>series.setData(maData(bars,period)));
+      analysisBars=bars;analysisCandle.setData(bars);updateAnalysisOpeningRange(true);updateAnalysisExtremes(bars);analysisMAs.forEach(({period,series})=>series.setData(maData(bars,period)));
       if(!background&&bars.length){
         const step=Number(analysisInterval)*60,count=48*3600/step;
         analysisChart.timeScale().setVisibleLogicalRange({from:bars.length-count-.5,to:bars.length-.5});
@@ -1327,7 +1350,7 @@
     const version=++analysisVersion;
     document.getElementById('optionAnalysisTitle').textContent='Bybit · 對應 '+binanceSymbol;
     analysisStatus.textContent='尋找相同到期時間、履約價與 CALL／PUT 的 Bybit 契約…';
-    ensureAnalysisChart();analysisBars=[];document.getElementById('analysis24Range').hidden=true;analysisCandle.setData([]);analysisCandle.setMarkers([]);analysisMAs.forEach(({series})=>series.setData([]));document.getElementById('optionAnalysisInfo').textContent='開 --　高 --　低 --　收 --';
+    ensureAnalysisChart();analysisBars=[];document.getElementById('analysisOpeningFill').hidden=true;analysisOpeningLines.forEach(line=>line.setData([]));document.getElementById('analysis24Range').hidden=true;analysisCandle.setData([]);analysisCandle.setMarkers([]);analysisMAs.forEach(({series})=>series.setData([]));document.getElementById('optionAnalysisInfo').textContent='開 --　高 --　低 --　收 --';
     try{
       const contracts=await getBybitContracts();if(version!==analysisVersion)return;
       const side=contract.side==='CALL'?'Call':'Put';
@@ -1492,7 +1515,6 @@
     info.textContent = '--';
     if (!firstBar || !Number.isFinite(firstBar.open)) { positionOptionMarks(); return; }
     let boundaries;
-    if (!liveMode) {
       const range = historicalRange(bars,currentEndMs,selectedInterval);
       if (!range || !Number.isFinite(firstBar.high) || !Number.isFinite(firstBar.low)) {
         info.textContent = '前兩個完整契約日資料不足，暫不顯示動態範圍';
@@ -1509,15 +1531,6 @@
         {price:base+inner,title:'現實範圍 上限 +' + pct(range.innerPct),color:'rgba(77,171,247,0.30)',labelColor:'#294b66'},
         {price:base-inner,title:'現實範圍 下限 −' + pct(range.innerPct),color:'rgba(77,171,247,0.30)',labelColor:'#294b66'}
       ];
-    } else {
-      info.textContent = '即時模式：理想 ±2,000／現實 ±1,000 點';
-      boundaries = [
-      {price:firstBar.open + 2000, title:'理想範圍 上限 +2,000'},
-      {price:firstBar.open - 2000, title:'理想範圍 下限 −2,000'},
-      {price:firstBar.open + 1000, title:'現實範圍 上限 +1,000', color:'rgba(77,171,247,0.30)', labelColor:'#294b66'},
-      {price:firstBar.open - 1000, title:'現實範圍 下限 −1,000', color:'rgba(77,171,247,0.30)', labelColor:'#294b66'}
-      ];
-    }
     idealRangeLines = boundaries.map((boundary,index) => { optionBoundaries.push({...boundary,side:index % 2 === 0 ? "CALL" : "PUT"}); return candleSeries.createPriceLine({
       price:boundary.price,
       title:boundary.title,
