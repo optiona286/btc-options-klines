@@ -1,5 +1,5 @@
 'use strict';
-const VERSION = 'btc-options-pwa-v6-opening-reference';
+const VERSION = 'btc-options-pwa-v7-live-isolation';
 const SHELL = VERSION + '-shell';
 const DATA = VERSION + '-data';
 const BASE = new URL('./', self.location.href);
@@ -15,6 +15,8 @@ self.addEventListener('fetch', event => {
   const request = event.request;
   const url = new URL(request.url);
   if (request.method !== 'GET' || url.origin !== BASE.origin || !url.pathname.startsWith(BASE.pathname)) return;
+  // The BTC live app owns its own service worker and navigation cache.
+  if (url.pathname.startsWith(new URL('./btc-live/', BASE).pathname)) return;
   const isNavigation = request.mode === 'navigate';
   const isData = ['data', 'data1'].some(mode => url.pathname.startsWith(new URL('./' + mode + '/', BASE).pathname));
   const canonical = new URL(url.pathname, BASE.origin).href;

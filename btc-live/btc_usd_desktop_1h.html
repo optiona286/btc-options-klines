@@ -3,8 +3,18 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
-  <title>BTC / USD 1H 行情｜電腦版</title>
-  <script src="https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
+  <title>BTC / USD 行情</title>
+  <meta name="theme-color" content="#111923" />
+  <meta name="application-name" content="BTC 行情" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="BTC 行情" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="../icons/icon-192.png" />
+  <link rel="icon" href="../icons/icon-192.png" />
+  <link rel="stylesheet" href="./pwa.css" />
+  <script defer src="./pwa.js"></script>
+  <script src="./vendor/lightweight-charts-4.2.3.js"></script>
   <style>
     :root{
       --bg:#151d27;
@@ -671,6 +681,7 @@
         <div class="symbol">BTC / USD</div>
         <div class="subsymbol">Binance BTCUSDT · 現貨歷史行情</div>
       </div>
+      <button id="pwaInstall" class="pwa-install" type="button" hidden>安裝 App</button>
       <div class="live-dot" title="API"></div>
       <button class="tf-pill">1H</button>
     </header>
@@ -1884,5 +1895,8 @@
   loadSelectedDate();
 })();
 </script>
+<div id="pwaNotice" class="pwa-notice" role="status" aria-live="polite" hidden>
+  <span id="pwaMessage"></span><button id="pwaAction" type="button">關閉</button>
+</div>
 </body>
 </html>

@@ -1,0 +1,17 @@
+{
+  "id": "./btc_usd_desktop_1h.html",
+  "name": "BTC / USD 行情",
+  "short_name": "BTC 行情",
+  "description": "BTC K 線、期權鏈與技術分析",
+  "lang": "zh-Hant",
+  "start_url": "./btc_usd_desktop_1h.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#151d27",
+  "theme_color": "#111923",
+  "icons": [
+    {"src":"../icons/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any"},
+    {"src":"../icons/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any"},
+    {"src":"../icons/icon-maskable-512.png","sizes":"512x512","type":"image/png","purpose":"maskable"}
+  ]
+}
