@@ -447,10 +447,6 @@
     .chain-table th.put-heading { background: #137b55; color: #fff; border-bottom: 0; }
     .chain-table th.strike-heading { background: #e4b535; color: #241b04; border-bottom: 0; }
     /* Keep responsive overrides after the shared desktop styles. */
-    .touch-modes { display: none; gap: 6px; }
-    .touch-modes button { border: 1px solid var(--line); border-radius: 6px; background: var(--panel2); color: var(--muted); font: inherit; padding: 6px 12px; min-height: 40px; }
-    .touch-modes button[aria-pressed="true"] { color: var(--cyan); border-color: var(--cyan); background: #123044; }
-    @media (pointer: coarse) { .touch-modes { display: flex; } }
     @media (max-width: 760px), (max-width: 980px) and (pointer: coarse) {
       .layout { min-width: 0; }
       .topbar { padding: 7px 10px; }
@@ -474,7 +470,6 @@
       .cross-info .card:nth-child(6) b { font-size: 12px !important; }
       .chart-wrap { min-height: clamp(300px, 48dvh, 550px); }
       .chart-footer { flex-wrap: wrap; flex-direction: row; align-items: center; gap: 5px; }
-      .touch-modes { display: flex; }
       #gestureHelp { flex-basis: 100%; }
     }
     @media (max-height: 500px) and (pointer: coarse) {
@@ -573,13 +568,12 @@
       .mobile-periods { display:flex; flex:1; min-width:0; gap:2px; overflow-x:auto; scrollbar-width:none; }
       .mobile-periods button,.mobile-chart-bar > button { background:transparent; color:var(--muted); border:0; border-radius:0; padding:8px 9px; font:inherit; font-size:12px; min-height:40px; white-space:nowrap; }
       .mobile-periods button[aria-pressed="true"] { color:var(--text); box-shadow:inset 0 -2px var(--amber); }
+      #mobilePriceLookup[aria-pressed="true"] { color:var(--cyan); box-shadow:inset 0 -2px var(--cyan); }
       .mobile-chart-bar > button[aria-expanded="true"] { color:var(--cyan); }
       .layout[data-mobile-view="chart"] .chart-tools { display:none; }
       .layout[data-mobile-view="chart"] .chart-wrap.mobile-tools-open .chart-tools { display:flex; position:absolute; top:40px; left:0; right:0; z-index:10; flex-wrap:wrap; max-height:45dvh; overflow:auto; padding:10px; background:var(--panel); border-bottom:1px solid var(--line2); box-shadow:0 8px 18px #0006; }
       .layout[data-mobile-view="chart"] .chart-tools .toggle { min-height:36px; padding:5px 9px; font-size:12px; }
-      .layout[data-mobile-view="chart"] .chart-footer { flex:0 0 auto; min-height:32px; padding:3px 8px; flex-wrap:nowrap; gap:8px; }
-      .layout[data-mobile-view="chart"] .touch-modes { gap:4px; }
-      .layout[data-mobile-view="chart"] .touch-modes button { min-height:28px; padding:3px 8px; font-size:10px; }
+      .layout[data-mobile-view="chart"] .chart-footer { border:0; flex:0 0 auto; min-height:24px; padding:3px 8px; flex-wrap:nowrap; gap:8px; }
       .layout[data-mobile-view="chart"] #gestureHelp { display:none; }
       .layout[data-mobile-view="chart"] #viewRange { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:9px; }
       .layout[data-mobile-view="chart"] .comparison-on { min-height:max(680px,calc(100dvh - 200px)); }
@@ -693,6 +687,7 @@
       <section class="chart-wrap" id="chartWrap">
         <div class="mobile-chart-bar">
           <div id="mobilePeriods" class="mobile-periods" role="group" aria-label="K 線週期"></div>
+          <button id="mobilePriceLookup" type="button" aria-pressed="false" title="查價時鎖住平移，仍可雙指縮放；再按一次退出">查價</button>
           <button id="mobileDetailsToggle" aria-expanded="false" aria-controls="symbolMeta sourceInfo finalSessionInfo finalSixHoursInfo">資訊</button>
           <button id="mobileToolsToggle" aria-expanded="false" aria-controls="chartTools">更多 ▾</button>
         </div>
@@ -730,7 +725,7 @@
           <div id="chartMessage" class="chart-message">正在載入行情…</div>
 
         </div>
-        <div class="chart-footer"><div class="touch-modes" role="group" aria-label="觸控操作模式"><button id="touchCrosshair" aria-pressed="true">十字線</button><button id="touchPan" aria-pressed="false">平移</button></div><span id="viewRange">--</span><span id="gestureHelp">拖曳平移 · 滾輪縮放 · 雙擊回到最新</span></div>
+        <div class="chart-footer"><span id="viewRange">--</span><span id="gestureHelp">拖曳平移 · 滾輪縮放 · 雙擊回到最新</span></div>
       </section>
     </main>
   </div>
@@ -823,7 +818,7 @@
 
     };
     const ctx = ui.chart.getContext("2d");
-    let touchMode = "crosshair";
+    let touchMode = "pan";
     const mobileLayout = window.matchMedia("(max-width: 760px), (max-width: 980px) and (pointer: coarse)");
     function setMobileView(view) {
       document.querySelector(".layout").dataset.mobileView = view;
@@ -835,14 +830,19 @@
       requestAnimationFrame(resizeAndDraw);
     }
     function updateMobileHelp() {
-      $("gestureHelp").textContent = mobileLayout.matches ? (touchMode === "crosshair" ? "滑動十字線 · 放開保留 · 雙指縮放" : "單指平移 · 輕點查看 · 雙指縮放") : "拖曳平移 · 滾輪縮放 · 雙擊回到最新";
+      $("gestureHelp").textContent = mobileLayout.matches ? (touchMode === "crosshair" ? "滑動十字線 · 放開保留 · 雙指縮放" : "單指平移 · 長按超過 2 秒查價 · 雙指縮放") : "拖曳平移 · 滾輪縮放 · 雙擊回到最新";
       resizeAndDraw();
     }
     mobileLayout.addEventListener("change", updateMobileHelp);
     function setTouchMode(mode) {
       touchMode = mode;
-      $("touchCrosshair").setAttribute("aria-pressed", String(mode === "crosshair"));
-      $("touchPan").setAttribute("aria-pressed", String(mode === "pan"));
+      const lookup = mode === "crosshair";
+      $("mobilePriceLookup").setAttribute("aria-pressed", String(lookup));
+      if (lookup && state.rows.length && state.hover < 0) {
+        state.hover = Math.min(state.rows.length - 1, state.start + Math.floor(state.visible / 2));
+        state.hoverY = null;
+        renderCrossInfo(state.rows[state.hover]);
+      } else if (!lookup) hideTooltip();
       updateMobileHelp();
     }
     $("mobileToolsToggle").addEventListener("click", () => {
@@ -855,8 +855,7 @@
       $("mobileDetailsToggle").setAttribute("aria-expanded", String(open));
       resizeAndDraw();
     });
-    $("touchCrosshair").addEventListener("click", () => setTouchMode("crosshair"));
-    $("touchPan").addEventListener("click", () => setTouchMode("pan"));
+    $("mobilePriceLookup").addEventListener("click", () => setTouchMode(touchMode === "crosshair" ? "pan" : "crosshair"));
     $("mobileChain").addEventListener("click", () => setMobileView("chain"));
     $("mobileChart").addEventListener("click", () => setMobileView("chart"));
     $("mobileFilter").addEventListener("click", () => setMobileView("filter"));
@@ -1795,7 +1794,8 @@
       const anchor = state.start + Math.floor(old * ratio);
       state.visible = next;
       state.start = Math.max(0, Math.min(state.rows.length - next, anchor - Math.floor(next * ratio)));
-      hideTooltip();
+      if (mobileLayout.matches && touchMode === "crosshair") retainLookup();
+      else hideTooltip();
       draw();
     }
 
@@ -1927,17 +1927,32 @@
     let pinch = null;
     let pointerMoved = false;
     let pointerOrigin = null;
+    let longPressTimer = null;
+    function cancelLongPress() {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+    }
+    const lookupLocked = () => mobileLayout.matches && touchMode === "crosshair";
+    function retainLookup() {
+      state.hover = Math.max(state.start, Math.min(state.start + state.visible - 1, state.hover));
+      renderCrossInfo(state.rows[state.hover]);
+    }
     function beginPinch() {
+      cancelLongPress();
       const [a, b] = [...chartPointers.values()];
       if (!a || !b) return;
       const rect = activeGestureCanvas.getBoundingClientRect();
       const ratio = Math.max(0, Math.min(1, ((a.x + b.x) / 2 - rect.left - 12) / Math.max(1, rect.width - 84)));
-      pinch = { distance: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), visible: state.visible, anchor: state.start + state.visible * ratio };
+      pinch = { distance: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), visible: state.visible, ratio, anchor: state.start + state.visible * ratio };
       pointerMoved = true;
-      hideTooltip();
+      if (!lookupLocked()) hideTooltip();
     }
     for (const gestureCanvas of [ui.chart, $("btcCompareChart")]) {
     gestureCanvas.addEventListener("pointermove", (event) => {
+      if (chartPointers.has(event.pointerId) && pointerOrigin && Math.hypot(event.clientX - pointerOrigin.x, event.clientY - pointerOrigin.y) > 5) {
+        pointerMoved = true;
+        cancelLongPress();
+      }
       if (chartPointers.has(event.pointerId)) chartPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
       if (chartPointers.size >= 2 && pinch && state.rows.length) {
         const [a, b] = [...chartPointers.values()];
@@ -1945,9 +1960,10 @@
         const rect = activeGestureCanvas.getBoundingClientRect();
         const ratio = Math.max(0, Math.min(1, ((a.x + b.x) / 2 - rect.left - 12) / Math.max(1, rect.width - 84)));
         state.visible = Math.min(state.rows.length, Math.max(Math.min(8, state.rows.length), Math.round(pinch.visible * pinch.distance / distance)));
-        state.start = Math.max(0, Math.min(state.rows.length - state.visible, Math.round(pinch.anchor - state.visible * ratio)));
+        state.start = Math.max(0, Math.min(state.rows.length - state.visible, Math.round(pinch.anchor - state.visible * (lookupLocked() ? pinch.ratio : ratio))));
+        if (lookupLocked()) retainLookup();
         draw();
-      } else if (chartPointers.has(event.pointerId) && event.pointerType !== "mouse" && touchMode === "crosshair") {
+      } else if (chartPointers.has(event.pointerId) && lookupLocked()) {
         pointerMoved = true;
         showTooltip(event);
       } else if (state.dragging && state.rows.length) {
@@ -1960,7 +1976,7 @@
           state.dragX = event.clientX;
           draw();
         }
-      } else if (event.pointerType !== "touch") {
+      } else if (!mobileLayout.matches && event.pointerType !== "touch") {
         showTooltip(event);
       }
     });
@@ -1977,15 +1993,25 @@
         pointerOrigin = { x: event.clientX, y: event.clientY };
         pointerMoved = false;
       }
+      if (mobileLayout.matches && touchMode === "pan" && chartPointers.size === 1) {
+        cancelLongPress();
+        longPressTimer = setTimeout(() => {
+          if (chartPointers.size !== 1 || pointerMoved) return;
+          pointerMoved = true;
+          setTouchMode("crosshair");
+          showTooltip({ currentTarget: gestureCanvas, clientX: event.clientX, clientY: event.clientY, pointerType: event.pointerType });
+        }, 2001);
+      }
       state.dragging = true;
       state.dragX = event.clientX;
       gestureCanvas.setPointerCapture(event.pointerId);
-      if (event.pointerType !== "mouse" && touchMode === "crosshair") showTooltip(event);
+      if (lookupLocked()) showTooltip(event);
       else hideTooltip();
       gestureCanvas.style.cursor = "grabbing";
       if (chartPointers.size >= 2) beginPinch();
     });
     function endDrag(event) {
+      cancelLongPress();
       const tap = event.type === "pointerup" && chartPointers.has(event.pointerId) && chartPointers.size === 1 && !pointerMoved;
       chartPointers.delete(event.pointerId);
       if (chartPointers.size < 2) pinch = null;
@@ -1996,8 +2022,9 @@
       }
       state.dragging = chartPointers.size > 0;
       gestureCanvas.style.cursor = state.dragging ? "grabbing" : "crosshair";
-      if (tap) showTooltip(event);
+      if (tap && (!mobileLayout.matches || lookupLocked())) showTooltip(event);
     }
+    gestureCanvas.addEventListener("contextmenu", (event) => { if (mobileLayout.matches) event.preventDefault(); });
     gestureCanvas.addEventListener("pointerup", endDrag);
     gestureCanvas.addEventListener("pointercancel", endDrag);
     gestureCanvas.addEventListener("lostpointercapture", endDrag);
@@ -2059,4 +2086,5 @@
   <script src="./pwa.js"></script>
 </body>
 </html>
+
 
