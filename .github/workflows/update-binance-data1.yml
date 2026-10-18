@@ -2,7 +2,7 @@ name: Update Binance BTC OP trade data1
 
 on:
   schedule:
-    - cron: '55 7 * * *' # 15:55 Asia/Taipei
+    - cron: '50,55 7 * * *' # 15:50 first capture, 15:55 refresh; Asia/Taipei
   workflow_dispatch:
     inputs:
       expiry_date:
