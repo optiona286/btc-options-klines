@@ -719,7 +719,7 @@
           <button class="toggle" data-action="csv">匯出 CSV</button>
         </div>
         <div class="comparison-pane">
-          <div class="comparison-heading">BTC / USD · 現貨<span>Coinbase · 與期權同步時間</span></div>
+          <div class="comparison-heading">BTC / USD · 現貨<span id="btcCompareProvider">載入後顯示來源 · 與期權同步時間</span></div>
           <div id="btcCrossInfo" class="comparison-info">--</div>
           <div id="btcCompareStage" class="comparison-stage">
             <canvas id="btcCompareChart" aria-label="BTC 現貨 K 線，與下方期權同步縮放與平移"></canvas>
@@ -743,7 +743,7 @@
     <button id="mobileFilter" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16M9 4v4M15 10v4M8 16v4"/></svg><span>篩選</span></button>
   </nav>
 
-  <script src="./static-api.js"></script>
+  <script src="./static-api.js?v=20261018-spot-fallback"></script>
   <script>
     const state = {
       file: "",
@@ -1095,7 +1095,7 @@
       $("lowValue").textContent = fmt(Math.min(...rows.map((r) => r.low)));
       $("volumeValue").textContent = fmt(rows.reduce((sum, r) => sum + r.volume, 0), 2);
       $("tradesValue").textContent = isBtc ? "--" : fmt(rows.reduce((sum, r) => sum + r.trades, 0), 0);
-      $("tradesValue").title = isBtc ? "Coinbase K 線 API 未提供成交筆數" : "";
+      $("tradesValue").title = isBtc ? `${data.provider} K 線 API 未提供成交筆數` : "";
       $("timeValue").textContent = last.time.slice(5, 16);
       $("barsValue").textContent = rows.length.toLocaleString();
       renderCrossInfo(last);
@@ -1385,6 +1385,7 @@
           }
         }
         if (request.id !== state.requestId || !state.compare) return;
+        $("btcCompareProvider").textContent = `${data.provider || "BTC/USD"} · 與期權同步時間`;
         state.btcRows = data.items || [];
         state.btcByTime = new Map(state.btcRows.map(row => [row.timeUtc, row]));
         $("btcCompareMessage").hidden = state.btcRows.length > 0;
@@ -1393,7 +1394,8 @@
       } catch (error) {
         if (request.id !== state.requestId || !state.compare) return;
         $("btcCompareMessage").hidden = false;
-        $("btcCompareMessage").textContent = "BTC 行情載入失敗，按重讀重試；期權圖仍可使用";
+        $("btcCompareProvider").textContent = "來源連線失敗";
+        $("btcCompareMessage").textContent = `BTC 行情載入失敗：${error?.message || "請按重讀重試"}；期權圖仍可使用`;
       }
     }
     function drawCompareBtc() {
