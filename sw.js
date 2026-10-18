@@ -1,9 +1,9 @@
 'use strict';
-const VERSION = 'btc-options-pwa-v11-gold-btc-icon';
+const VERSION = 'btc-options-pwa-v12-gold-icon-filenames';
 const SHELL = VERSION + '-shell';
 const DATA = VERSION + '-data';
 const BASE = new URL('./', self.location.href);
-const SHELL_PATHS = ['./', './index.html', './static-api.js', './pwa.js', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png'];
+const SHELL_PATHS = ['./', './index.html', './static-api.js', './pwa.js', './manifest.webmanifest', './icons/btc-gold-32.png', './icons/btc-gold-192.png', './icons/btc-gold-512.png', './icons/btc-gold-maskable-512.png'];
 const SHELL_URLS = new Set(SHELL_PATHS.map(path => new URL(path, BASE).href));
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(SHELL).then(cache => cache.addAll([...SHELL_URLS])).then(() => self.skipWaiting()));

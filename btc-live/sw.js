@@ -1,8 +1,8 @@
 'use strict';
-const CACHE = 'btc-live-pwa-v5-gold-btc-icon';
+const CACHE = 'btc-live-pwa-v6-gold-icon-filenames';
 const BASE = new URL('./', self.location.href);
 const PAGE = new URL('btc_usd_desktop_1h.html', BASE).href;
-const ASSETS = [PAGE, 'pwa.js', 'pwa.css', 'manifest.webmanifest', 'vendor/lightweight-charts-4.2.3.js', 'icons/btc-live-180.png', 'icons/btc-live-192.png', 'icons/btc-live-512.png'].map(path => new URL(path, BASE).href);
+const ASSETS = [PAGE, 'pwa.js', 'pwa.css', 'manifest.webmanifest', 'vendor/lightweight-charts-4.2.3.js', 'icons/btc-live-gold-32.png', 'icons/btc-live-gold-180.png', 'icons/btc-live-gold-192.png', 'icons/btc-live-gold-512.png'].map(path => new URL(path, BASE).href);
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
 });
