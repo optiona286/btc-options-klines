@@ -1,5 +1,5 @@
 'use strict';
-const VERSION = 'btc-options-pwa-v9-range-price-labels';
+const VERSION = 'btc-options-pwa-v10-yellow-range-extremes';
 const SHELL = VERSION + '-shell';
 const DATA = VERSION + '-data';
 const BASE = new URL('./', self.location.href);

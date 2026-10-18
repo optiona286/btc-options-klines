@@ -985,8 +985,8 @@
   let optionSocket = null, optionRetryAt = 0, optionRetryDelay = 1000, optionLastMessage = 0;
   const onlineOptionMarks = new Map();
   let openingRangeBounds = null;
-  const openingRangeHigh = chart.addLineSeries({color:'rgba(157,123,255,0.65)',lineWidth:2,lineStyle:LightweightCharts.LineStyle.Dashed,title:'範圍最高價',priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:false});
-  const openingRangeLow = chart.addLineSeries({color:'rgba(157,123,255,0.65)',lineWidth:2,lineStyle:LightweightCharts.LineStyle.Dashed,title:'範圍最低價',priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:false});
+  const openingRangeHigh = chart.addLineSeries({color:'rgba(157,123,255,0.30)',lineWidth:2,lineStyle:LightweightCharts.LineStyle.Dashed,title:'',priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
+  const openingRangeLow = chart.addLineSeries({color:'rgba(157,123,255,0.30)',lineWidth:2,lineStyle:LightweightCharts.LineStyle.Dashed,title:'',priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
 
   const volumeSeries = chart.addHistogramSeries({
     priceFormat: { type: 'volume' },
@@ -1120,10 +1120,22 @@
     fill.style.display = right > left && bottom > top ? 'block' : 'none';
   }
 
+  function yellowRangeMarkers(bars) {
+    const valid = bars.filter(bar => Number.isFinite(bar.high) && Number.isFinite(bar.low));
+    if (!valid.length) return [];
+    const high = valid.reduce((a,b) => b.high > a.high ? b : a);
+    const low = valid.reduce((a,b) => b.low < a.low ? b : a);
+    return [
+      {time:high.time,position:'aboveBar',color:'#ff8292',shape:'arrowDown',text:'黃區最高 '+fmtPrice(high.high)},
+      {time:low.time,position:'belowBar',color:'#49dcb4',shape:'arrowUp',text:'黃區最低 '+fmtPrice(low.low)}
+    ].sort((a,b) => a.time-b.time);
+  }
+
   function updateRangeOverlay() {
     positionOptionMarks();
     updateOpeningRangeFill();
     positionOptionMarks();
+    updateHighLowMarkers(currentBars);
     if (!showRange || !currentBars.length) {
       rangeOverlay.style.display = 'none';
       return;
@@ -1186,6 +1198,11 @@
   function updateHighLowMarkers(bars) {
     if (!bars.length) {
       candleSeries.setMarkers([]);
+      return;
+    }
+    if (showRange) {
+      const start = currentEndMs - RANGE_HOURS * HOUR;
+      candleSeries.setMarkers(yellowRangeMarkers(bars.filter(bar => bar.openTime >= start && bar.openTime < currentEndMs)));
       return;
     }
     let highBar = bars[0];
@@ -1302,7 +1319,7 @@
     const host=document.getElementById('optionAnalysisChart');
     analysisChart=LightweightCharts.createChart(host,{layout:{background:{color:'#101722'},textColor:'#9aa9bb'},grid:{vertLines:{color:'#263140'},horzLines:{color:'#263140'}},rightPriceScale:{borderColor:'#303c4c'},timeScale:{timeVisible:true,borderColor:'#303c4c',tickMarkFormatter:time=>fmtMDHM(Number(time)*1000)},localization:{priceFormatter:fmtPrice,timeFormatter:time=>fmtFull(Number(time)*1000)}});
     analysisCandle=analysisChart.addCandlestickSeries({upColor:'#29c39a',downColor:'#f64e66',borderVisible:false,wickUpColor:'#29c39a',wickDownColor:'#f64e66',priceFormat:{type:'price',precision:4,minMove:.0001}});
-    analysisOpeningLines=['rgba(157,123,255,.65)','rgba(157,123,255,.65)','#ffffff'].map((color,i)=>analysisChart.addLineSeries({color,lineWidth:2,lineStyle:i===2?LightweightCharts.LineStyle.Solid:LightweightCharts.LineStyle.Dashed,title:['範圍最高價','範圍最低價','基準線'][i],priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:false}));
+    analysisOpeningLines=['rgba(157,123,255,.55)','rgba(157,123,255,.55)','#ffffff'].map((color,i)=>analysisChart.addLineSeries({color,lineWidth:2,lineStyle:i===2?LightweightCharts.LineStyle.Solid:LightweightCharts.LineStyle.Dashed,title:i===2?'基準線':'',priceLineVisible:false,lastValueVisible:i===2,crosshairMarkerVisible:false}));
     analysisMAs=[7,25,99].map((period,i)=>({period,series:analysisChart.addLineSeries({color:['#f4ce3a','#e86cad','#8b79dd'][i],lineWidth:1,priceLineVisible:false,lastValueVisible:false})}));
     new ResizeObserver(()=>{const range=analysisChart.timeScale().getVisibleLogicalRange();analysisChart.resize(host.clientWidth,host.clientHeight);if(range)analysisChart.timeScale().setVisibleLogicalRange(range);updateAnalysis24Range();}).observe(host);
     analysisChart.timeScale().subscribeVisibleLogicalRangeChange(updateAnalysis24Range);
@@ -1363,14 +1380,10 @@
     overlay.title=fmtFull(start*1000)+' → '+fmtFull(end*1000)+'（台灣時間）';
   }
   function updateAnalysisExtremes(bars){
-    if(!bars.length){analysisCandle.setMarkers([]);return;}
-    const step=Number(analysisInterval)*60;
-    const recent=bars.filter(bar=>bar.time>=bars[bars.length-1].time-48*3600+step);
-    const high=recent.reduce((a,b)=>b.high>a.high?b:a),low=recent.reduce((a,b)=>b.low<a.low?b:a);
-    analysisCandle.setMarkers([
-      {time:high.time,position:'aboveBar',color:'#ff8292',shape:'arrowDown',text:'最高 '+fmtPrice(high.high)},
-      {time:low.time,position:'belowBar',color:'#49dcb4',shape:'arrowUp',text:'最低 '+fmtPrice(low.low)}
-    ].sort((a,b)=>a.time-b.time));
+    if(!bars.length||!analysisExpiry){analysisCandle.setMarkers([]);return;}
+    const end=analysisExpiry/1000,start=end-24*3600;
+    const yellowBars=bars.filter(bar=>bar.time>=start&&bar.time<end);
+    analysisCandle.setMarkers(yellowRangeMarkers(yellowBars));
   }
   async function loadOptionAnalysis(background=false){
     if(!analysisSymbol||!liveMode||background&&analysisBusy)return;
