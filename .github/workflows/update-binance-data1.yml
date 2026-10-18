@@ -1,0 +1,49 @@
+name: Update Binance BTC OP trade data1
+
+on:
+  schedule:
+    - cron: '55 7 * * *' # 15:55 Asia/Taipei
+  workflow_dispatch:
+    inputs:
+      expiry_date:
+        description: 'Optional expiry YYYY-MM-DD; blank uses the current Taipei date. Expired contracts may no longer be available.'
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+# Do not delay the pre-expiry fetch behind a manual Bybit catch-up job.
+# Git publication fetches and rebases the separate data1-only commit.
+concurrency:
+  group: btc-binance-data1-main
+  cancel-in-progress: false
+
+jobs:
+  update-data1:
+    if: github.repository == 'optiona286/btc-options-klines' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - name: Check out main
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+
+      - name: Set commit author
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+      - name: Fetch Binance option trades, convert data1 and publish
+        env:
+          REQUEST_EXPIRY: ${{ inputs.expiry_date }}
+        run: node cloud-automation/data1/run.mjs --publish

@@ -3,6 +3,8 @@
 ## 每日雲端自動更新（data）
 GitHub Actions 每天台灣時間晚上 8 點下載官方 BTC OP ZIP、精簡為既有 1h 格式並推送 `data` 更新；不使用 R2，不處理 data1。設定與本機 ZIP 同步方式見 [雲端自動化說明](cloud-automation/README.md)。
 
+另有獨立的 [幣安 data1 雲端流程](cloud-automation/data1/README.md)，每天台灣時間 15:55 抓取當日到期 BTC OP 的 15m 成交 K 線、轉換並只推送 data1。GitHub 排程可能延後，且最後一根 K 棒是接近到期前的快照。
+
 ## 啟動
 需要 Node.js 20.3 或以上，無第三方套件或安裝步驟。
 執行 `npm start`，預設網址 http://127.0.0.1:5083。

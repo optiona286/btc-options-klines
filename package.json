@@ -10,7 +10,8 @@
     "start:btc-live": "node btc-live/btc-options-live-server.cjs",
     "op:cloud": "node cloud-automation/run.mjs",
     "op:sync": "node cloud-automation/sync-local.mjs --pull",
-    "test:op-cloud": "node --test cloud-automation/test/*.test.mjs"
+    "test:op-cloud": "node --test cloud-automation/test/*.test.mjs",
+    "data1:cloud": "node cloud-automation/data1/run.mjs"
   },
   "engines": {
     "node": ">=20.3"
