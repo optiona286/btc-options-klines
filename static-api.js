@@ -214,51 +214,86 @@ function optionTimestamp(row) {
 }
 
 async function fetchBtcCandles(start, end, granularity, signal) {
-  // Coinbase public candles: [time, low, high, open, close, volume]; max 300 per request.
   const key = `${start}:${end}:${granularity}`;
   const cached = btcCache.get(key);
-  if (cached && cached.expires > Date.now()) return cached.items;
-  const bars = new Map();
+  if (cached && cached.expires > Date.now()) return cached.result;
   const step = granularity * 1000;
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) throw new Error("BTC/USD 時間範圍無效");
   if ((end - start) / step > 10000) throw new Error("此契約時間範圍過長，請選擇較短的資料檔");
-  for (let cursor = start; cursor < end; cursor += step * 299) {
-    signal.throwIfAborted();
-    const pageEnd = Math.min(end, cursor + step * 299);
-    const url = new URL("https://api.exchange.coinbase.com/products/BTC-USD/candles");
-    url.searchParams.set("start", new Date(cursor).toISOString());
-    url.searchParams.set("end", new Date(pageEnd).toISOString());
-    url.searchParams.set("granularity", String(granularity));
-    let response;
+  const providers = [
+    {
+      name: "Coinbase Exchange", pageSize: 299,
+      url(from, to) {
+        const url = new URL("https://api.exchange.coinbase.com/products/BTC-USD/candles");
+        url.search = new URLSearchParams({start: new Date(from).toISOString(), end: new Date(to - 1).toISOString(), granularity: String(granularity)});
+        return url;
+      },
+      candles(data) { return Array.isArray(data) ? data : null; }
+    },
+    {
+      name: "Bitstamp", pageSize: 999,
+      url(from, to) {
+        const url = new URL("https://www.bitstamp.net/api/v2/ohlc/btcusd/");
+        url.search = new URLSearchParams({step: String(granularity), start: String(Math.floor(from / 1000)), end: String(Math.floor((to - 1) / 1000)), limit: String(Math.ceil((to - from) / step))});
+        return url;
+      },
+      candles(data) {
+        return Array.isArray(data?.data?.ohlc) ? data.data.ohlc.map(c => [c.timestamp, c.low, c.high, c.open, c.close, c.volume]) : null;
+      }
+    }
+  ];
+  const errors = [];
+  for (const provider of providers) {
+    // Start the whole range over on fallback: do not mix exchanges within one chart.
+    const bars = new Map();
     try {
-      response = await fetch(url, { signal, headers: { Accept: "application/json" } });
+      for (let cursor = start; cursor < end; cursor += step * provider.pageSize) {
+        signal.throwIfAborted();
+        const pageEnd = Math.min(end, cursor + step * provider.pageSize);
+        const controller = new AbortController();
+        const cancel = () => controller.abort(signal.reason);
+        signal.addEventListener("abort", cancel, {once: true});
+        const timeout = setTimeout(() => controller.abort(new DOMException("行情來源連線逾時", "TimeoutError")), 8000);
+        let candles;
+        try {
+          signal.throwIfAborted();
+          const response = await fetch(provider.url(cursor, pageEnd), {signal: controller.signal, headers: {Accept: "application/json"}});
+          if (!response.ok) throw new Error(response.status === 429 ? "請求過於頻繁（HTTP 429）" : `HTTP ${response.status}`);
+          candles = provider.candles(await response.json());
+          if (!Array.isArray(candles)) throw new Error("行情回傳格式異常");
+        } finally {
+          clearTimeout(timeout);
+          signal.removeEventListener("abort", cancel);
+        }
+        for (const candle of candles) {
+          if (!Array.isArray(candle) || candle.length < 6 || candle.slice(0, 6).some(n => n === null || n === "" || !Number.isFinite(Number(n)))) continue;
+          const [seconds, low, high, open, close, volume] = candle.map(Number);
+          const time = seconds * 1000;
+          if (time < start || time >= end || time >= Date.now()) continue;
+          if (low <= 0 || high < Math.max(open, close) || low > Math.min(open, close) || volume < 0) continue;
+          bars.set(time, {
+            time: formatMarketTime(time, true), timeUtc: formatMarketTime(time),
+            closeTime: formatMarketTime(time + step - 1000, true), closeTimeUtc: formatMarketTime(time + step - 1000),
+            open, high, low, close, volume,
+            quoteVolume: null, trades: null, takerBuyVolume: null, takerBuyQuoteVolume: null
+          });
+        }
+      }
+      signal.throwIfAborted();
+      const items = [...bars.entries()].sort((a, b) => a[0] - b[0]).map(entry => entry[1]);
+      if (!items.length) throw new Error("此時間區間沒有 BTC/USD K 線");
+      const result = {items, provider: provider.name};
+      btcCache.delete(key);
+      btcCache.set(key, {result, expires: Date.now() + (end < Date.now() - 3600000 ? 3600000 : 30000)});
+      while (btcCache.size > 24) btcCache.delete(btcCache.keys().next().value);
+      return result;
     } catch (error) {
-      if (signal.aborted) throw error;
-      throw new Error("無法連線 Coinbase BTC/USD API，請確認網路後按重讀");
+      // A changed selection or overall request timeout must stop all providers.
+      signal.throwIfAborted();
+      errors.push(provider.name + "：" + (error?.message || "連線失敗"));
     }
-    if (!response.ok) throw new Error(response.status === 429 ? "BTC/USD API 請求過於頻繁，請稍候再重讀" : `BTC/USD API 暫時無法提供資料（HTTP ${response.status}）`);
-    const candles = await response.json();
-    if (!Array.isArray(candles)) throw new Error("BTC/USD API 回傳格式異常");
-    for (const candle of candles) {
-      if (!Array.isArray(candle) || candle.length < 6 || candle.slice(0, 6).some((n) => n === null || !Number.isFinite(Number(n)))) continue;
-      const [seconds, low, high, open, close, volume] = candle.map(Number);
-      const time = seconds * 1000;
-      if (time < start || time >= end || time >= Date.now()) continue;
-      if (low <= 0 || high < Math.max(open, close) || low > Math.min(open, close) || volume < 0) continue;
-      bars.set(time, {
-        time: formatMarketTime(time, true), timeUtc: formatMarketTime(time),
-        closeTime: formatMarketTime(time + step - 1000, true), closeTimeUtc: formatMarketTime(time + step - 1000),
-        open, high, low, close, volume,
-        quoteVolume: null, trades: null, takerBuyVolume: null, takerBuyQuoteVolume: null,
-      });
-    }
-    if (pageEnd < end) await new Promise((resolve) => setTimeout(resolve, 150));
   }
-  const items = [...bars.entries()].sort((a, b) => a[0] - b[0]).map((entry) => entry[1]);
-  if (!items.length) throw new Error("Coinbase 在此契約對應的時間區間沒有 BTC/USD K 線資料");
-  btcCache.delete(key);
-  btcCache.set(key, { items, expires: Date.now() + (end < Date.now() - 3600000 ? 3600000 : 30000) });
-  while (btcCache.size > 24) btcCache.delete(btcCache.keys().next().value);
-  return items;
+  throw new Error("BTC/USD 所有來源皆無法載入（" + errors.join("；") + "），請稍後按重讀");
 }
 
 async function getBtcKlines(fileName, symbol, period, signal) {
@@ -281,13 +316,13 @@ async function getBtcKlines(fileName, symbol, period, signal) {
   const sourceInterval = selectedPeriod === "15m" ? "15m" : "1h";
   const granularity = periodMinutes(sourceInterval) * 60;
   const availableEnd = Math.min(end, Math.ceil(Date.now() / (granularity * 1000)) * granularity * 1000);
-  const rawItems = await fetchBtcCandles(start, availableEnd, granularity, signal);
+  const {items: rawItems, provider} = await fetchBtcCandles(start, availableEnd, granularity, signal);
   const items = aggregateBars(rawItems, selectedPeriod, sourceInterval).map((bar) => ({
     ...bar, quoteVolume: null, trades: null, takerBuyVolume: null, takerBuyQuoteVolume: null,
     timeUtc: formatMarketTime(Date.parse(bar.time.replace(" ", "T") + "+08:00")),
   }));
   return {
-    ok: true, market: "btc", symbol: "BTC-USD", provider: "Coinbase Exchange", file: selected,
+    ok: true, market: "btc", symbol: "BTC-USD", provider, file: selected,
     reference: { symbol, expiryDate: reference.expiryDate, strikePrice: reference.strikePrice },
     range: { start: formatMarketTime(start, true), end: formatMarketTime(end - 1000, true),
       optionStart: formatMarketTime(optionStart, true), optionEnd: formatMarketTime(optionEnd - 1000, true) },
