@@ -70,6 +70,8 @@
       font-size:29px;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;
     }
     .symbol-wrap{min-width:0;flex:1}
+    .btc-brand-icon{width:36px;height:36px;object-fit:cover;border-radius:10px;flex-shrink:0;}
+    @media(max-width:480px){.btc-brand-icon{width:28px;height:28px;border-radius:8px;}}
     .symbol{
       font-weight:750;
       letter-spacing:.1px;
@@ -677,6 +679,7 @@
 
     <header class="topbar">
       <button class="back" aria-label="返回">‹</button>
+      <img class="btc-brand-icon" src="./icons/btc-live-192.png" alt="BTC" width="36" height="36" />
       <div class="symbol-wrap">
         <div class="symbol">BTC / USD</div>
         <div class="subsymbol">Binance BTCUSDT · 現貨歷史行情</div>

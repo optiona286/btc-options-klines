@@ -1,5 +1,5 @@
 'use strict';
-const CACHE = 'btc-live-pwa-v4-yellow-range-extremes';
+const CACHE = 'btc-live-pwa-v5-gold-btc-icon';
 const BASE = new URL('./', self.location.href);
 const PAGE = new URL('btc_usd_desktop_1h.html', BASE).href;
 const ASSETS = [PAGE, 'pwa.js', 'pwa.css', 'manifest.webmanifest', 'vendor/lightweight-charts-4.2.3.js', 'icons/btc-live-180.png', 'icons/btc-live-192.png', 'icons/btc-live-512.png'].map(path => new URL(path, BASE).href);

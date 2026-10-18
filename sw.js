@@ -1,5 +1,5 @@
 'use strict';
-const VERSION = 'btc-options-pwa-v10-yellow-range-extremes';
+const VERSION = 'btc-options-pwa-v11-gold-btc-icon';
 const SHELL = VERSION + '-shell';
 const DATA = VERSION + '-data';
 const BASE = new URL('./', self.location.href);
