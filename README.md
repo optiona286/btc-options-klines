@@ -34,7 +34,7 @@ GitHub Pages會使用static-api.js，由瀏覽器讀取data精簡資料並聚合
 
 ## 後續新增資料
 
-參考 [資料轉換工具說明](資料轉換工具/README.md)。將 ZIP 放入 `G:\Mark Price Kline BTC` 的月份資料夾，使用手動轉換或自動監看（來源可在工具的 config.json 修改），更新 1h 精簡資料後自行提交上傳。原始 ZIP 不會進 Git。
+參考 [資料轉換工具說明](資料轉換工具/README.md)。將 ZIP 放入 `G:\BTC系統\Mark Price Kline BTC` 的月份資料夾，使用手動轉換或自動監看（來源可在工具的 config.json 修改），更新 1h 精簡資料後自行提交上傳。原始 ZIP 不會進 Git。
 
 ## 上下對比 K 線
 
@@ -45,7 +45,7 @@ GitHub Pages會使用static-api.js，由瀏覽器讀取data精簡資料並聚合
 新增幣安 15m CSV 至 原始資料/幣安成交 後，啟動本機網頁即可自動轉換；也可執行 node convert-binance-data1.cjs；產生 data1/manifest.json 及 binance-日期.json.gz。按重讀即可更新。只有合約清單或空價格列不會產生 K 線。
 
 ## 自動轉換（本機）
-雙擊啟動_K線系統.vbs，開啟 5083 網頁後，後端只在啟動或重新整理／重開網頁時檢查一次新資料，沒有定時掃描。ZIP 放在 G:/Mark Price Kline BTC，幣安 15m CSV 放在 原始資料/幣安成交（可含子資料夾）。請等檔案複製完成後再重新整理。前端顯示轉換進度與錯誤，完成後自動刷新目前模式。
+雙擊啟動_K線系統.vbs，開啟 5083 網頁後，後端只在啟動或重新整理／重開網頁時檢查一次新資料，沒有定時掃描。ZIP 放在 G:/BTC系統/Mark Price Kline BTC，幣安 15m CSV 放在 原始資料/幣安成交（可含子資料夾）。請等檔案複製完成後再重新整理。前端顯示轉換進度與錯誤，完成後自動刷新目前模式。
 幣安增量轉換保留既有到期日與 K 線；相同合約、相同時間的 K 線以新資料取代，成交量不會重複累加。移走原始 CSV 不會刪除精簡資料。匯入修正資料會替換同時間 K 線，但不會刪除其他既有 K 線。
 目前接受原有標記價格 ZIP，以及含 symbol/expiryDate/interval/openTimeUtc/closeTimeUtc/OHLC 欄位的幣安 15m CSV。1h 版本與未知格式會顯示提示，不混入 15m 資料；合約清單與失敗清單略過。
 關閉瀏覽器分頁後，後台仍運作；再次開啟啟動檔會使用現有服務。GitHub Pages 只讀取已轉換資料，不監看本機、不自動上傳 Git。

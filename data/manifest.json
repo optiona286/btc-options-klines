@@ -5,25 +5,117 @@
   "dataType": "OPTION_MARK_PRICE_OHLC",
   "volumeAvailable": false,
   "window": "Expiry UTC date minus two days through expiry UTC date",
-  "generatedAt": "2026-10-12T12:28:30.836Z",
-  "sourceFiles": 2456,
+  "generatedAt": "2026-10-18T13:38:53.440Z",
+  "sourceFiles": 2462,
   "files": [
+    {
+      "name": "2026-10-19",
+      "path": "2026-10-19.json.gz",
+      "date": "2026-10-19",
+      "interval": "1h",
+      "size": 32088,
+      "modifiedAt": "2026-10-18T13:38:53.440Z",
+      "sourceDays": 1,
+      "firstDate": "2026-10-17",
+      "lastDate": "2026-10-17",
+      "missingDates": [
+        "2026-10-18",
+        "2026-10-19"
+      ],
+      "barCount": 1296,
+      "symbolCount": 54,
+      "volumeAvailable": false
+    },
+    {
+      "name": "2026-10-18",
+      "path": "2026-10-18.json.gz",
+      "date": "2026-10-18",
+      "interval": "1h",
+      "size": 62927,
+      "modifiedAt": "2026-10-18T13:38:53.440Z",
+      "sourceDays": 2,
+      "firstDate": "2026-10-16",
+      "lastDate": "2026-10-17",
+      "missingDates": [
+        "2026-10-18"
+      ],
+      "barCount": 2570,
+      "symbolCount": 54,
+      "volumeAvailable": false
+    },
+    {
+      "name": "2026-10-17",
+      "path": "2026-10-17.json.gz",
+      "date": "2026-10-17",
+      "interval": "1h",
+      "size": 78463,
+      "modifiedAt": "2026-10-18T13:38:53.440Z",
+      "sourceDays": 3,
+      "firstDate": "2026-10-15",
+      "lastDate": "2026-10-17",
+      "missingDates": [],
+      "barCount": 3250,
+      "symbolCount": 60,
+      "volumeAvailable": false
+    },
+    {
+      "name": "2026-10-16",
+      "path": "2026-10-16.json.gz",
+      "date": "2026-10-16",
+      "interval": "1h",
+      "size": 90626,
+      "modifiedAt": "2026-10-18T13:38:49.731Z",
+      "sourceDays": 3,
+      "firstDate": "2026-10-14",
+      "lastDate": "2026-10-16",
+      "missingDates": [],
+      "barCount": 4030,
+      "symbolCount": 78,
+      "volumeAvailable": false
+    },
+    {
+      "name": "2026-10-15",
+      "path": "2026-10-15.json.gz",
+      "date": "2026-10-15",
+      "interval": "1h",
+      "size": 70737,
+      "modifiedAt": "2026-10-18T13:38:45.893Z",
+      "sourceDays": 3,
+      "firstDate": "2026-10-13",
+      "lastDate": "2026-10-15",
+      "missingDates": [],
+      "barCount": 2862,
+      "symbolCount": 56,
+      "volumeAvailable": false
+    },
+    {
+      "name": "2026-10-14",
+      "path": "2026-10-14.json.gz",
+      "date": "2026-10-14",
+      "interval": "1h",
+      "size": 67954,
+      "modifiedAt": "2026-10-18T13:38:41.892Z",
+      "sourceDays": 3,
+      "firstDate": "2026-10-12",
+      "lastDate": "2026-10-14",
+      "missingDates": [],
+      "barCount": 2788,
+      "symbolCount": 52,
+      "volumeAvailable": false
+    },
     {
       "name": "2026-10-13",
       "path": "2026-10-13.json.gz",
       "date": "2026-10-13",
       "interval": "1h",
-      "size": 25963,
-      "modifiedAt": "2026-10-12T12:28:30.836Z",
-      "sourceDays": 1,
+      "size": 63052,
+      "modifiedAt": "2026-10-18T13:38:38.059Z",
+      "sourceDays": 3,
       "firstDate": "2026-10-11",
-      "lastDate": "2026-10-11",
-      "missingDates": [
-        "2026-10-12",
-        "2026-10-13"
-      ],
-      "barCount": 1028,
-      "symbolCount": 46,
+      "lastDate": "2026-10-13",
+      "missingDates": [],
+      "barCount": 2576,
+      "symbolCount": 50,
       "volumeAvailable": false
     },
     {
@@ -31,15 +123,13 @@
       "path": "2026-10-12.json.gz",
       "date": "2026-10-12",
       "interval": "1h",
-      "size": 59221,
-      "modifiedAt": "2026-10-12T12:28:30.836Z",
-      "sourceDays": 2,
+      "size": 68402,
+      "modifiedAt": "2026-10-18T13:38:34.133Z",
+      "sourceDays": 3,
       "firstDate": "2026-10-10",
-      "lastDate": "2026-10-11",
-      "missingDates": [
-        "2026-10-12"
-      ],
-      "barCount": 2400,
+      "lastDate": "2026-10-12",
+      "missingDates": [],
+      "barCount": 2800,
       "symbolCount": 50,
       "volumeAvailable": false
     },
@@ -16748,7 +16838,7 @@
       "path": "2024-01-08.json.gz",
       "date": "2024-01-08",
       "interval": "1h",
-      "size": 5761,
+      "size": 21607,
       "modifiedAt": "2026-10-09T09:34:57.634Z",
       "sourceDays": 1,
       "firstDate": "2024-01-06",
@@ -19762,7 +19852,7 @@
       "path": "2023-07-15.json.gz",
       "date": "2023-07-15",
       "interval": "1h",
-      "size": 3066,
+      "size": 14110,
       "modifiedAt": "2026-10-09T08:55:17.163Z",
       "sourceDays": 1,
       "firstDate": "2023-07-13",
@@ -41238,6 +41328,6 @@
       "dataType": "OPTION_MARK_PRICE_OHLC_SAMPLED"
     }
   ],
-  "totalBars": 1877780,
-  "totalBytes": 44836866
+  "totalBars": 1896524,
+  "totalBytes": 45312821
 }

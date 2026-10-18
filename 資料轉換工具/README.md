@@ -2,7 +2,7 @@
 
 需要 Node.js 20.3 以上，無須安裝套件。這個工具可隨 Git 專案下載到任何電腦使用。
 
-1. 新資料 ZIP 直接放入 `G:\Mark Price Kline BTC` 的月份資料夾，工具會遞迴讀取，不用搬移檔案。預設來源設定在 `config.json` 的 `sourceDirectory`，換電腦或位置時修改此欄位即可。
+1. 新資料 ZIP 直接放入 `G:\BTC系統\Mark Price Kline BTC` 的月份資料夾，工具會遞迴讀取，不用搬移檔案。預設來源設定在 `config.json` 的 `sourceDirectory`，換電腦或位置時修改此欄位即可。
 2. 雙擊「手動轉換.cmd」立即轉換；或雙擊「自動監看.cmd」，保持視窗開啟，每 10 秒檢查並轉換新檔。按 Ctrl+C 或關閉視窗即可停止。
 3. 轉換完成後，重新整理網頁。若要更新 GitHub Pages，手動提交並推送 `data` 變更；程式不會自動上傳。
 
