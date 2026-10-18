@@ -1,0 +1,17 @@
+{
+  "name": "btc-op-daily-scheduler",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-10-18",
+  "workers_dev": true,
+  "triggers": {
+    "crons": ["0 12 * * *"]
+  },
+  "vars": {
+    "GITHUB_REPOSITORY": "optiona286/btc-options-klines",
+    "GITHUB_BRANCH": "main",
+    "GITHUB_WORKFLOW": "update-op-data.yml"
+  },
+  "observability": {
+    "enabled": true
+  }
+}

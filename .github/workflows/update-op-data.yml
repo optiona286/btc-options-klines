@@ -1,0 +1,57 @@
+name: Update BTC OP mark-price data
+
+on:
+  schedule:
+    - cron: '0 12 * * *' # 20:00 Asia/Taipei
+  workflow_dispatch:
+    inputs:
+      start_date:
+        description: 'Optional UTC start date (inclusive); leave blank to catch up automatically'
+        type: string
+        required: false
+      end_date:
+        description: 'Optional UTC end date (exclusive); provide both dates together'
+        type: string
+        required: false
+      refresh:
+        description: 'Intentionally replace already imported source days in the specified range'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: btc-op-mark-data-main
+  cancel-in-progress: false
+
+jobs:
+  update:
+    if: github.repository == 'optiona286/btc-options-klines' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    steps:
+      - name: Check out main
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+
+      - name: Set commit author
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+      - name: Download official ZIPs, compact data, validate and push
+        env:
+          REQUEST_START: ${{ inputs.start_date }}
+          REQUEST_END: ${{ inputs.end_date }}
+          REQUEST_REFRESH: ${{ inputs.refresh }}
+        run: node cloud-automation/cloud-entry.mjs

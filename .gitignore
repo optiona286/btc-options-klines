@@ -19,3 +19,8 @@ Thumbs.db
 data1/*.csv
 
 原始資料/
+
+cloud-automation/cloudflare/.wrangler/
+cloud-automation/cloudflare/.dev.vars
+cloud-automation/cloudflare/.dev.vars.*
+*.part

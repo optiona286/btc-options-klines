@@ -1,0 +1,7 @@
+{
+  "repository": "optiona286/btc-options-klines",
+  "branch": "main",
+  "firstSourceDate": "2026-10-01",
+  "maxDaysPerRun": 7,
+  "localBaseYear": 2026
+}

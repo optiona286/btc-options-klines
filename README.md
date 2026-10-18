@@ -1,5 +1,8 @@
 # BTC Options K 線系統：獨立 1h 精簡專案
 
+## 每日雲端自動更新（data）
+GitHub Actions 每天台灣時間晚上 8 點下載官方 BTC OP ZIP、精簡為既有 1h 格式並推送 `data` 更新；不使用 R2，不處理 data1。設定與本機 ZIP 同步方式見 [雲端自動化說明](cloud-automation/README.md)。
+
 ## 啟動
 需要 Node.js 20.3 或以上，無第三方套件或安裝步驟。
 執行 `npm start`，預設網址 http://127.0.0.1:5083。

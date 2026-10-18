@@ -7,7 +7,10 @@
     "start": "node server.js",
     "convert": "node 資料轉換工具/convert.js",
     "watch-data": "node 資料轉換工具/convert.js --watch",
-    "start:btc-live": "node btc-live/btc-options-live-server.cjs"
+    "start:btc-live": "node btc-live/btc-options-live-server.cjs",
+    "op:cloud": "node cloud-automation/run.mjs",
+    "op:sync": "node cloud-automation/sync-local.mjs --pull",
+    "test:op-cloud": "node --test cloud-automation/test/*.test.mjs"
   },
   "engines": {
     "node": ">=20.3"
