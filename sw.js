@@ -1,5 +1,5 @@
 'use strict';
-const VERSION = 'btc-options-pwa-v7-live-isolation';
+const VERSION = 'btc-options-pwa-v8-spot-fallback';
 const SHELL = VERSION + '-shell';
 const DATA = VERSION + '-data';
 const BASE = new URL('./', self.location.href);
