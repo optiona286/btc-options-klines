@@ -22,14 +22,10 @@ export async function dispatch(env, fetchImpl = fetch) {
 }
 
 export default {
-  async scheduled(controller, env) {
-    const result = await dispatch(env);
-    console.log(JSON.stringify({ ...result, scheduledAt: new Date(controller.scheduledTime).toISOString() }));
-  },
   async fetch(request) {
     const url = new URL(request.url);
     if (request.method === 'GET' && url.pathname === '/health') {
-      return Response.json({ service: 'BTC OP daily scheduler', timezone: 'Asia/Taipei', time: '20:00', storage: 'no R2', execution: 'GitHub Actions' });
+      return Response.json({ service: 'BTC OP dispatch helper', scheduleEnabled: false, storage: 'no R2', execution: 'GitHub Actions' });
     }
     return new Response('Not found', { status: 404 });
   },

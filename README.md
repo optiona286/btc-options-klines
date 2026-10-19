@@ -1,9 +1,9 @@
 # BTC Options K 線系統：獨立 1h 精簡專案
 
-## 每日雲端自動更新（data）
-GitHub Actions 每天台灣時間晚上 8 點下載官方 BTC OP ZIP、精簡為既有 1h 格式並推送 `data` 更新；不使用 R2，不處理 data1。設定與本機 ZIP 同步方式見 [雲端自動化說明](cloud-automation/README.md)。
+## 網頁觸發自動更新（data）
+開啟 GitHub Pages，在「授權自動更新 data」輸入專用 Fine-grained Token（只選本儲存庫，Actions: Read and write）。Token 僅留在分頁記憶體，重新整理或關閉即清除。授權後網頁檢查缺少的 UTC 來源日，觸發原有 Actions 下載官方 ZIP、驗證、精簡及存回 Git，顯示進度並載入最新資料。已移除 20:00 排程。不使用 Cloudflare 或 R2。見 [雲端自動化說明](cloud-automation/README.md)。
 
-另有獨立的 [幣安 data1 雲端流程](cloud-automation/data1/README.md)，每天台灣時間 15:50 先抓取、15:55 再更新當日到期 BTC OP 的 15m 成交 K 線，重新產生暫存 CSV、轉換並只推送 data1；相同合約與時間以後次資料取代，不重複累加。GitHub 排程可能延後，且最後一根 K 棒是接近到期前的快照。
+幣安 data1 已改回本機排程，每日 15:50、15:55 執行；幣安 GitHub workflow 已停用。這次網頁更新只處理 Bybit data。
 
 ## 啟動
 需要 Node.js 20.3 或以上，無第三方套件或安裝步驟。

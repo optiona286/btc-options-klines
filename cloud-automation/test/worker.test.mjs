@@ -26,10 +26,11 @@ test('missing credentials, changed destination, or rejected dispatch cannot look
 test('no public HTTP request can trigger a GitHub mutation', async () => {
   assert.equal((await worker.fetch(new Request('https://worker.example/run', { method: 'POST' }))).status, 404);
   const health = await worker.fetch(new Request('https://worker.example/health'));
-  assert.equal((await health.json()).time, '20:00');
+  assert.equal((await health.json()).scheduleEnabled, false);
 });
-test('the single daily schedule is 20:00 Asia/Taipei, or 12:00 UTC', async () => {
+test('the optional Worker has no schedule', async () => {
   const config = JSON.parse(await fs.readFile(new URL('../cloudflare/wrangler.jsonc', import.meta.url), 'utf8'));
-  assert.deepEqual(config.triggers.crons, ['0 12 * * *']);
+  assert.deepEqual(config.triggers.crons, []);
+  assert.equal('scheduled' in worker, false);
   assert.equal('r2_buckets' in config, false);
 });

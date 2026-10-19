@@ -1,14 +1,16 @@
 (() => {
 'use strict';
 const dataCache=new Map(),btcCache=new Map();let manifest=null, activeMode="data";
+const dataURL=relative=>location.hostname==='optiona286.github.io'?new URL(relative,'https://raw.githubusercontent.com/optiona286/btc-options-klines/main/'):new URL('./'+relative,document.baseURI);
+window.btcResetStaticData=()=>{manifest=null;dataCache.clear();};
 function listDataFiles(){return manifest.files;}
 function resolveDataFile(name){const files=listDataFiles();if(!files.length)throw new Error('沒有精簡資料');return files.find(file=>file.name===name)||files[0];}
 function loadRows(name){const selected=resolveDataFile(name),cached=dataCache.get(selected.name);if(!cached)throw new Error('資料尚未載入');return {selected,...cached};}
 async function prepare(name,signal,mode="data"){
  if(activeMode!==mode){manifest=null;activeMode=mode;}
- if(!manifest){const response=await fetch(new URL('./'+activeMode+'/manifest.json',document.baseURI),{signal,cache:'no-store'});if(!response.ok)throw new Error('到期日清單讀取失敗');manifest=await response.json();}
+ if(!manifest){const response=await fetch(dataURL(activeMode+'/manifest.json'),{signal,cache:'no-store'});if(!response.ok)throw new Error('到期日清單讀取失敗');manifest=await response.json();}
  const selected=resolveDataFile(name);if(dataCache.has(selected.name))return;
- const response=await fetch(new URL('./'+activeMode+'/'+selected.path,document.baseURI),{signal});if(!response.ok)throw new Error('精簡資料下載失敗');
+ const response=await fetch(dataURL(activeMode+'/'+selected.path),{signal,cache:'no-store'});if(!response.ok)throw new Error('精簡資料下載失敗');
  const bytes=new Uint8Array(await response.arrayBuffer());
  const text=bytes[0]===31&&bytes[1]===139?await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text():new TextDecoder().decode(bytes);
  const content=JSON.parse(text),rows=[],bySymbol=new Map();

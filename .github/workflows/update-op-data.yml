@@ -1,8 +1,6 @@
 name: Update BTC OP mark-price data
 
 on:
-  schedule:
-    - cron: '0 12 * * *' # 20:00 Asia/Taipei
   workflow_dispatch:
     inputs:
       start_date:

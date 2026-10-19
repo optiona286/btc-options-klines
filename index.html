@@ -615,6 +615,13 @@
       <div class="controls">
         <div class="field">
           <div id="importStatus" role="status" style="font-size:11px;color:var(--muted);margin-bottom:6px;overflow-wrap:anywhere">自動轉換：連線中…</div>
+          <div id="gitUpdatePanel" hidden style="margin-bottom:10px;font-size:12px">
+            <button class="btn" id="gitUpdateAuthorize" type="button">授權自動更新 data</button>
+            <button class="btn" id="gitUpdateCheck" type="button" hidden>檢查更新</button>
+            <button class="btn" id="gitUpdateForget" type="button" hidden>清除授權</button>
+            <div id="gitUpdateStatus" role="status" aria-live="polite" style="margin-top:6px;overflow-wrap:anywhere">尚未授權更新</div>
+            <a id="gitUpdateRun" target="_blank" rel="noopener noreferrer" hidden>查看執行紀錄</a>
+          </div>
           <label for="datasetMode">資料模式</label><select id="datasetMode" style="margin-bottom:8px"><option value="data">原有標記價格（data）</option><option value="data1">幣安成交 K 線（data1）</option></select>
           <label for="fileYear">選擇到期日期</label>
           <div class="expiry-date-controls">
@@ -736,7 +743,7 @@
     <button id="mobileFilter" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16M9 4v4M15 10v4M8 16v4"/></svg><span>篩選</span></button>
   </nav>
 
-  <script src="./static-api.js?v=20261018-spot-fallback"></script>
+  <script src="./static-api.js?v=20261019-web-data-update"></script>
   <script>
     const state = {
       file: "",
@@ -2059,7 +2066,7 @@
     let importRevision = null;
     let importPolling = false;
     async function pollImportStatus() {
-      if (location.hostname.endsWith("github.io")) { $("importStatus").textContent = "雲端精簡資料模式（自動轉換請開本機 5083）"; return; }
+      if (location.hostname.endsWith("github.io")) { $("importStatus").textContent = "雲端資料 · data 可在本分頁授權自動更新"; return; }
       if (importPolling || document.hidden) return;
       importPolling = true;
       try {
@@ -2084,6 +2091,7 @@
 
   </script>
   <script src="./pwa.js"></script>
+  <script type="module" src="./git-data-update.mjs"></script>
 </body>
 </html>
 
