@@ -26,11 +26,11 @@ function setup() {
   const el = id => document.getElementById(id);
   el('gitUpdatePanel').hidden = false;
   // Authorization exists only in this closure, never in storage, URLs, logs or source.
-  let token = '', busy = false, generation = 0, nextCheck = 0;
+  let token = '', busy = false, generation = 0;
   const status = message => { el('gitUpdateStatus').textContent = message; };
   const dialog = document.createElement('dialog');
   dialog.style.cssText = 'max-width:460px;width:90%;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:12px;padding:20px';
-  dialog.innerHTML = `<form><h3>授權更新 Bybit data</h3><p>Token 僅留在此分頁記憶體；重新整理或關閉即清除。授權後會自動檢查缺少的日期，啟動下載、精簡及存回 Git。</p><p>建立專用 Fine-grained Token，只選 btc-options-klines，設定 Repository permissions → Actions: Read and write。請設定短效期。</p><p><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">前往 GitHub 建立 Token</a></p><label>專用 GitHub Token<input type="password" required autocomplete="off" spellcheck="false" style="display:block;width:100%;margin:10px 0" aria-label="專用 GitHub Token"></label><button class="btn" type="submit">授權並檢查更新</button> <button class="btn" type="button" data-cancel>取消</button></form>`;
+  dialog.innerHTML = `<form><h3>授權更新 Bybit data</h3><p>Token 僅留在此分頁記憶體；重新整理或關閉即清除。按下更新後會在後台執行一次：檢查缺少日期、下載、精簡及存回 Git。不設定排程。</p><p>建立專用 Fine-grained Token，只選 btc-options-klines，設定 Repository permissions → Actions: Read and write。請設定短效期。</p><p><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">前往 GitHub 建立 Token</a></p><label>專用 GitHub Token<input type="password" required autocomplete="off" spellcheck="false" style="display:block;width:100%;margin:10px 0" aria-label="專用 GitHub Token"></label><button class="btn" type="submit">授權並更新一次</button> <button class="btn" type="button" data-cancel>取消</button></form>`;
   document.body.append(dialog);
   const input = dialog.querySelector('input');
   dialog.querySelector('[data-cancel]').onclick = () => dialog.close();
@@ -38,15 +38,15 @@ function setup() {
   el('gitUpdateAuthorize').onclick = () => { dialog.showModal(); input.focus(); };
   dialog.querySelector('form').onsubmit = event => {
     event.preventDefault(); token = input.value.trim(); input.value = ''; dialog.close();
-    generation++; nextCheck = 0;
+    generation++;
     el('gitUpdateCheck').hidden = false; el('gitUpdateForget').hidden = false;
     el('gitUpdateAuthorize').textContent = '更換授權';
     check();
   };
   el('gitUpdateForget').onclick = () => {
-    token = ''; generation++; input.value = ''; nextCheck = 0;
+    token = ''; generation++; input.value = '';
     el('gitUpdateCheck').hidden = true; el('gitUpdateForget').hidden = true;
-    el('gitUpdateAuthorize').textContent = '授權自動更新 data';
+    el('gitUpdateAuthorize').textContent = '手動更新 data';
     status('授權已清除；已啟動的雲端工作仍會完成。');
   };
   el('gitUpdateCheck').onclick = () => check(true);
@@ -82,8 +82,8 @@ function setup() {
         if (ownGeneration !== generation) return;
         window.btcResetStaticData?.(); el('refresh').click();
         if (missing.length) {
-          nextCheck = Date.now() + 30 * 60000;
-          status(`工作完成；仍缺 ${missing.length} 個來源日（最早 ${missing[0]}）。可能尚未發布或待分批補齊，30 分鐘後再檢查。`);
+
+          status(`工作完成；仍缺 ${missing.length} 個來源日（最早 ${missing[0]}）。可能尚未發布或待分批補齊，可再按「檢查更新」。`);
         } else { status('更新完成，已存回 Git 並重新載入資料。'); }
         return;
       }
@@ -94,8 +94,8 @@ function setup() {
     }
     throw Error('工作尚未完成，可查看執行紀錄，稍後再檢查。');
   }
-  async function check(manual = false) {
-    if (!token || busy || (!manual && (document.hidden || Date.now() < nextCheck))) return;
+  async function check() {
+    if (!token || busy) return;
     busy = true; el('gitUpdateCheck').disabled = true;
     const ownGeneration = generation;
     try {
@@ -123,15 +123,15 @@ function setup() {
         const run = recent.workflow_runs.find(run => !previous.has(run.id));
         if (run) { await watch(run, ownGeneration); return; }
       }
-      throw Error('GitHub 已接受更新，但尚未出現執行紀錄；稍後會重新檢查。');
+      throw Error('GitHub 已接受更新，但尚未出現執行紀錄；請稍後按「檢查更新」。');
     } catch (error) {
-      if (ownGeneration === generation) { status(error.message); nextCheck = Date.now() + 30 * 60000; }
+      if (ownGeneration === generation) { status(error.message); }
     } finally {
       busy = false; el('gitUpdateCheck').disabled = false;
       if (ownGeneration !== generation && token) check();
     }
   }
-  setInterval(() => check(), 60000);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+
+
   window.addEventListener('pagehide', () => { token = ''; generation++; input.value = ''; });
 }

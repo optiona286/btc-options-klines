@@ -4,12 +4,12 @@
 
 ## 使用
 
-1. 開啟 GitHub Pages，按「授權自動更新 data」。
+1. 開啟 GitHub Pages，按「手動更新 data」。
 2. 在 GitHub 建立專用 Fine-grained Token，僅選 btc-options-klines，Repository permissions 設定 Actions: Read and write，設定短效期。
 3. 在網頁輸入 Token。它只留在分頁 JavaScript 記憶體，不存入 localStorage、sessionStorage、Cookie、Git、日誌或網址。重新整理、離開頁面或關閉即清除。請勿把 Token 貼到聊天。
-4. 網頁每分鐘檢查缺少的 UTC 來源日；有缺日才觸發雲端下載、CRC 驗證、既有 1h 精簡、資料驗證、自動提交及正常推送 main。
+4. 按一次更新，只檢查一次缺少的 UTC 來源日；有缺日才觸發雲端下載、CRC 驗證、既有 1h 精簡、資料驗證、自動提交及正常推送 main。
 
-工作中的執行會顯示進度及紀錄連結，不再重複觸發。GitHub concurrency 仍保留，避免交錯推送。工作結束後讀回 main 的 manifest 核對，再重新載入圖表。若仍缺日期、官方 ZIP 尚未發布、或執行失敗，顯示結果並延後 30 分鐘重試，也可按「檢查更新」。
+工作中的執行會顯示進度及紀錄連結，不再重複觸發。GitHub concurrency 仍保留，避免交錯推送。工作結束後讀回 main 的 manifest 核對，再重新載入圖表。若仍缺日期、官方 ZIP 尚未發布、或執行失敗，顯示結果，不自動重試；可按「手動更新」手動再執行。
 
 當日尚未結束的 UTC 資料不下載，每次最多補 7 天。只處理 Bybit data，不處理幣安 data1。相同來源日已涵蓋就略過。官方修正舊檔時，可在 Actions 手動指定日期並勾選 refresh。
 

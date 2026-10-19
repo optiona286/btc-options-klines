@@ -616,8 +616,8 @@
         <div class="field">
           <div id="importStatus" role="status" style="font-size:11px;color:var(--muted);margin-bottom:6px;overflow-wrap:anywhere">自動轉換：連線中…</div>
           <div id="gitUpdatePanel" hidden style="margin-bottom:10px;font-size:12px">
-            <button class="btn" id="gitUpdateAuthorize" type="button">授權自動更新 data</button>
-            <button class="btn" id="gitUpdateCheck" type="button" hidden>檢查更新</button>
+            <button class="btn" id="gitUpdateAuthorize" type="button">手動更新 data</button>
+            <button class="btn" id="gitUpdateCheck" type="button" hidden>手動更新</button>
             <button class="btn" id="gitUpdateForget" type="button" hidden>清除授權</button>
             <div id="gitUpdateStatus" role="status" aria-live="polite" style="margin-top:6px;overflow-wrap:anywhere">尚未授權更新</div>
             <a id="gitUpdateRun" target="_blank" rel="noopener noreferrer" hidden>查看執行紀錄</a>
@@ -2066,7 +2066,7 @@
     let importRevision = null;
     let importPolling = false;
     async function pollImportStatus() {
-      if (location.hostname.endsWith("github.io")) { $("importStatus").textContent = "雲端資料 · data 可在本分頁授權自動更新"; return; }
+      if (location.hostname.endsWith("github.io")) { $("importStatus").textContent = "雲端資料 · 按手動更新可在後台下載、精簡及存回 Git"; return; }
       if (importPolling || document.hidden) return;
       importPolling = true;
       try {
