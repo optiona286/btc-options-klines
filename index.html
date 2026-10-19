@@ -615,13 +615,14 @@
       <div class="controls">
         <div class="field">
           <div id="importStatus" role="status" style="font-size:11px;color:var(--muted);margin-bottom:6px;overflow-wrap:anywhere">自動轉換：連線中…</div>
-          <div id="gitUpdatePanel" hidden style="margin-bottom:10px;font-size:12px">
+          <details id="gitUpdatePanel" hidden style="margin-bottom:10px;font-size:12px">
+            <summary style="cursor:pointer;color:var(--muted);padding:5px 0">資料更新</summary>
             <button class="btn" id="gitUpdateAuthorize" type="button">手動更新 data</button>
             <button class="btn" id="gitUpdateCheck" type="button" hidden>手動更新</button>
             <button class="btn" id="gitUpdateForget" type="button" hidden>清除授權</button>
             <div id="gitUpdateStatus" role="status" aria-live="polite" style="margin-top:6px;overflow-wrap:anywhere">尚未授權更新</div>
             <a id="gitUpdateRun" target="_blank" rel="noopener noreferrer" hidden>查看執行紀錄</a>
-          </div>
+          </details>
           <label for="datasetMode">資料模式</label><select id="datasetMode" style="margin-bottom:8px"><option value="data">原有標記價格（data）</option><option value="data1">幣安成交 K 線（data1）</option></select>
           <label for="fileYear">選擇到期日期</label>
           <div class="expiry-date-controls">
@@ -2066,7 +2067,7 @@
     let importRevision = null;
     let importPolling = false;
     async function pollImportStatus() {
-      if (location.hostname.endsWith("github.io")) { $("importStatus").textContent = "雲端資料 · 按手動更新可在後台下載、精簡及存回 Git"; return; }
+      if (location.hostname.endsWith("github.io")) { $("importStatus").hidden = true; return; }
       if (importPolling || document.hidden) return;
       importPolling = true;
       try {
