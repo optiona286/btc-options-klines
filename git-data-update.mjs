@@ -25,23 +25,14 @@ if (typeof document !== 'undefined' && location.origin === 'https://optiona286.g
 function setup() {
   const el = id => document.getElementById(id);
   el('gitUpdatePanel').hidden = false;
-  // Persist authorization in this browser at the user's request; never put it in URLs or logs.
-  const storageKey = 'btc-options-klines:github-actions-token';
-  function storedToken() {
-    try {
-      const saved = localStorage.getItem(storageKey);
-      if (saved) return saved;
-      const previous = sessionStorage.getItem(storageKey) || '';
-      if (previous) { localStorage.setItem(storageKey, previous); sessionStorage.removeItem(storageKey); }
-      return previous;
-    } catch { return ''; }
-  }
-  function saveToken(value) { try { if (value) localStorage.setItem(storageKey, value); else localStorage.removeItem(storageKey); sessionStorage.removeItem(storageKey); } catch { /* Memory-only fallback when browser storage is blocked. */ } }
+  // Persistent browser authorization was withdrawn; remove any earlier saved copy.
+  try { localStorage.removeItem('btc-options-klines:github-actions-token'); sessionStorage.removeItem('btc-options-klines:github-actions-token'); } catch {}
+  // Authorization exists only in this closure, never in storage, URLs, logs or source.
   let token = '', busy = false, generation = 0;
   const status = message => { el('gitUpdateStatus').textContent = message; };
   const dialog = document.createElement('dialog');
   dialog.style.cssText = 'max-width:460px;width:90%;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:12px;padding:20px';
-  dialog.innerHTML = `<form><h3>授權更新 Bybit data</h3><p>Token 保存在這個瀏覽器，重新整理、關閉後重開都不必重填；按「清除授權」或清除網站資料才會移除。按下更新後會在後台執行一次：檢查缺少日期、下載、精簡及存回 Git。不設定排程。</p><p>建立專用 Fine-grained Token，只選 btc-options-klines，設定 Repository permissions → Actions: Read and write。請設定短效期。</p><p><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">前往 GitHub 建立 Token</a></p><label>專用 GitHub Token<input type="password" required autocomplete="off" spellcheck="false" style="display:block;width:100%;margin:10px 0" aria-label="專用 GitHub Token"></label><button class="btn" type="submit">授權並更新一次</button> <button class="btn" type="button" data-cancel>取消</button></form>`;
+  dialog.innerHTML = `<form><h3>授權更新 Bybit data</h3><p>Token 僅留在此分頁記憶體；重新整理或關閉即清除。按下更新後會在後台執行一次：檢查缺少日期、下載、精簡及存回 Git。不設定排程。</p><p>建立專用 Fine-grained Token，只選 btc-options-klines，設定 Repository permissions → Actions: Read and write。請設定短效期。</p><p><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">前往 GitHub 建立 Token</a></p><label>專用 GitHub Token<input type="password" required autocomplete="off" spellcheck="false" style="display:block;width:100%;margin:10px 0" aria-label="專用 GitHub Token"></label><button class="btn" type="submit">授權並更新一次</button> <button class="btn" type="button" data-cancel>取消</button></form>`;
   document.body.append(dialog);
   const input = dialog.querySelector('input');
   dialog.querySelector('[data-cancel]').onclick = () => dialog.close();
@@ -49,7 +40,6 @@ function setup() {
   el('gitUpdateAuthorize').onclick = () => { dialog.showModal(); input.focus(); };
   dialog.querySelector('form').onsubmit = event => {
     event.preventDefault(); token = input.value.trim(); input.value = ''; dialog.close();
-    saveToken(token);
     generation++;
     el('gitUpdateCheck').hidden = false; el('gitUpdateForget').hidden = false;
     el('gitUpdateAuthorize').textContent = '更換授權';
@@ -57,25 +47,11 @@ function setup() {
   };
   el('gitUpdateForget').onclick = () => {
     token = ''; generation++; input.value = '';
-    saveToken('');
     el('gitUpdateCheck').hidden = true; el('gitUpdateForget').hidden = true;
     el('gitUpdateAuthorize').textContent = '手動更新 data';
     status('授權已清除；已啟動的雲端工作仍會完成。');
   };
   el('gitUpdateCheck').onclick = () => check(true);
-  function restoreAuthorization() {
-    token = storedToken();
-    if (!token) {
-      el('gitUpdateCheck').hidden = true; el('gitUpdateForget').hidden = true;
-      el('gitUpdateAuthorize').textContent = '手動更新 data';
-      status('尚未授權更新');
-      return;
-    }
-    el('gitUpdateCheck').hidden = false; el('gitUpdateForget').hidden = false;
-    el('gitUpdateAuthorize').textContent = '更換授權';
-    status('已載入此瀏覽器保存的授權，可按「手動更新」。');
-  }
-  restoreAuthorization();
   async function api(route, method = 'GET', body) {
     const response = await fetch(API + route, {
       method, cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(30000),
@@ -83,7 +59,7 @@ function setup() {
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
     if (!response.ok) {
-      if (response.status === 401) { saveToken(''); throw Error('Token 無效或已到期，請重新授權。'); }
+      if (response.status === 401) throw Error('Token 無效或已到期，請重新授權。');
       if (response.status === 403 || response.status === 404) throw Error('無法存取工作流程；請確認專案權限及 Actions: Read and write，或稍後重試。');
       throw Error(`GitHub 回應 HTTP ${response.status}，請稍後重試。`);
     }
@@ -160,8 +136,4 @@ function setup() {
 
 
   window.addEventListener('pagehide', () => { token = ''; generation++; input.value = ''; });
-  window.addEventListener('pageshow', event => { if (event.persisted) restoreAuthorization(); });
-  window.addEventListener('storage', event => {
-    if (event.key === storageKey || event.key === null) { generation++; restoreAuthorization(); }
-  });
 }
