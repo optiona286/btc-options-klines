@@ -1,7 +1,7 @@
 {
-  "name": "btc-op-daily-scheduler",
+  "name": "btc-data-update",
   "main": "worker.mjs",
-  "compatibility_date": "2026-10-18",
+  "compatibility_date": "2026-10-19",
   "workers_dev": true,
   "triggers": {
     "crons": []
@@ -12,6 +12,31 @@
     "GITHUB_WORKFLOW": "update-op-data.yml"
   },
   "observability": {
-    "enabled": true
-  }
+    "enabled": true,
+    "traces": {
+      "enabled": true
+    }
+  },
+  "account_id": "552eb52d78aad7804e9915f37a567f0c",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "ratelimits": [
+    {
+      "simple": {
+        "period": 60,
+        "limit": 20
+      },
+      "namespace_id": "76101901",
+      "name": "AUTH_LIMIT"
+    },
+    {
+      "simple": {
+        "period": 60,
+        "limit": 1
+      },
+      "namespace_id": "76101902",
+      "name": "UPDATE_LIMIT"
+    }
+  ]
 }

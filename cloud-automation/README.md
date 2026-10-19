@@ -1,27 +1,17 @@
-# BTC OP 網頁觸發更新
+# Bybit data 手動更新後台
 
-已移除 GitHub 20:00 定時排程，改由 GitHub Pages 前端觸發 update-op-data.yml 的 workflow_dispatch。Cloudflare 選配設定也已移除 cron，沒有部署或重新授權 Cloudflare。
+網頁按一次「手動更新 data」，輸入更新密碼，由 Cloudflare Worker 觸發既有 GitHub Actions：下載官方 ZIP、CRC 驗證、精簡 1h、核對資料、自動提交 main。沒有 cron、不循環執行、不使用 R2，幣安 data1 本機工作維持原設定。
 
-## 使用
+GitHub 專用 Token 僅存 Cloudflare Secret GITHUB_TOKEN，前端不取得也不保存。更新密碼的 SHA-256 雜湊存 UPDATE_PASSWORD_HASH，使用固定長度、constant-time 比對。公開介面僅允許指定專案與 main 的固定工作流程；限制 Origin、嘗試次數與更新頻率，遇到執行中的工作不再觸發第二次。GitHub concurrency 仍保留。
 
-1. 開啟 GitHub Pages，按「手動更新 data」。
-2. 在 GitHub 建立專用 Fine-grained Token，僅選 btc-options-klines，Repository permissions 設定 Actions: Read and write，設定短效期。
-3. 在網頁輸入 Token。它只留在分頁 JavaScript 記憶體，不存入 localStorage、sessionStorage、Cookie、Git、日誌或網址。重新整理、離開頁面或關閉即清除。請勿把 Token 貼到聊天。
-4. 按一次更新，只檢查一次缺少的 UTC 來源日；有缺日才觸發雲端下載、CRC 驗證、既有 1h 精簡、資料驗證、自動提交及正常推送 main。
+## 一次性設定
 
-工作中的執行會顯示進度及紀錄連結，不再重複觸發。GitHub concurrency 仍保留，避免交錯推送。工作結束後讀回 main 的 manifest 核對，再重新載入圖表。若仍缺日期、官方 ZIP 尚未發布、或執行失敗，顯示結果，不自動重試；可按「手動更新」手動再執行。
+完成 Wrangler login 及 deploy 後，執行 cloud-automation/cloudflare/setup-local.mjs。工具只綁定 127.0.0.1 隨機連接埠，產生一次性設定網址。使用者在本機頁面輸入專用 Fine-grained Token（僅本儲存庫、Actions: Read and write）與至少 12 字元更新密碼；工具驗證後將 Token 與密碼雜湊寫入 Worker Secret，不把秘密寫入原始碼、檔案、聊天或日誌。成功後自動關閉本機設定服務。重設秘密可再次執行此工具。
 
-當日尚未結束的 UTC 資料不下載，每次最多補 7 天。只處理 Bybit data，不處理幣安 data1。相同來源日已涵蓋就略過。官方修正舊檔時，可在 Actions 手動指定日期並勾選 refresh。
+前端只在本分頁記憶體保留更新密碼，GitHub Token 不會送到瀏覽器。各裝置均可用同一個更新密碼操作，不必重填 GitHub Token。請勿共用 GitHub 帳號登入密碼作為更新密碼。
 
-原始 ZIP 僅放 runner 暫存目錄，結束即刪除，不上傳 Git、不放 R2、不建立 artifact。網頁只負責觸發和監看；關閉分頁停止檢查，已啟動的雲端工作繼續執行。GitHub 工作仍可能排隊。
+## 資料行為
 
-GitHub Pages 直接讀取遠端 main 的公開 data/data1 原始內容，避免 Actions bot 提交未觸發 Pages 重新建置而讀到舊資料。網頁與程式仍由 Pages 部署。
+檢查缺少的 UTC 來源日，有缺才執行。當天未結束的來源不下載，每次最多 7 天。原始 ZIP 暫存於 runner，轉換結束即清除，不上傳 Git。工作結束後讀回 main manifest 並重新載入圖表；官方尚未發布時顯示待補，不自動重試。
 
-## 本機與手動工具
-
-- npm run op:cloud：下載／精簡，不推送。
-- node cloud-automation/run.mjs --publish：要求乾淨且與 origin/main 一致的 checkout，驗證後僅推送 data。
-- npm run op:sync 或 cloud-automation/同步雲端資料與原始ZIP.ps1：fast-forward 更新本機，再依 manifest 補抓官方 ZIP 到既有原始資料路徑，不覆寫既有 ZIP。
-- npm run test:op-cloud：既有離線驗證。
-
-官方 API：https://docs.github.com/en/rest/actions/workflows#create-a-workflow-dispatch-event
+程式修改後以 Wrangler deploy 部署 Worker，以 git push 部署 GitHub Pages。不要使用公開前端保存 GitHub Token。

@@ -1,6 +1,6 @@
 const REPO = 'optiona286/btc-options-klines';
 const WORKFLOW = 'update-op-data.yml';
-const API = `https://api.github.com/repos/${REPO}`;
+const API = 'https://btc-data-update.d1043190.workers.dev/github';
 const RAW = `https://raw.githubusercontent.com/${REPO}/main/`;
 const DAY = 86400000;
 
@@ -27,12 +27,12 @@ function setup() {
   el('gitUpdatePanel').hidden = false;
   // Persistent browser authorization was withdrawn; remove any earlier saved copy.
   try { localStorage.removeItem('btc-options-klines:github-actions-token'); sessionStorage.removeItem('btc-options-klines:github-actions-token'); } catch {}
-  // Authorization exists only in this closure, never in storage, URLs, logs or source.
+  // Only the update password is held in memory. GitHub credentials stay in the Worker.
   let token = '', busy = false, generation = 0;
   const status = message => { el('gitUpdateStatus').textContent = message; };
   const dialog = document.createElement('dialog');
   dialog.style.cssText = 'max-width:460px;width:90%;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:12px;padding:20px';
-  dialog.innerHTML = `<form><h3>授權更新 Bybit data</h3><p>Token 僅留在此分頁記憶體；重新整理或關閉即清除。按下更新後會在後台執行一次：檢查缺少日期、下載、精簡及存回 Git。不設定排程。</p><p>建立專用 Fine-grained Token，只選 btc-options-klines，設定 Repository permissions → Actions: Read and write。請設定短效期。</p><p><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">前往 GitHub 建立 Token</a></p><label>專用 GitHub Token<input type="password" required autocomplete="off" spellcheck="false" style="display:block;width:100%;margin:10px 0" aria-label="專用 GitHub Token"></label><button class="btn" type="submit">授權並更新一次</button> <button class="btn" type="button" data-cancel>取消</button></form>`;
+  dialog.innerHTML = `<form><h3>手動更新 data</h3><p>輸入更新密碼，後台就執行一次下載、精簡、驗證及存回 Git。GitHub Token 已放在後台，這裡不需填寫。</p><label>更新密碼<input type="password" name="password" required autocomplete="current-password" style="display:block;width:100%;margin:10px 0" aria-label="更新密碼"></label><button class="btn" type="submit">確認更新</button> <button class="btn" type="button" data-cancel>取消</button></form>`;
   document.body.append(dialog);
   const input = dialog.querySelector('input');
   dialog.querySelector('[data-cancel]').onclick = () => dialog.close();
@@ -42,28 +42,27 @@ function setup() {
     event.preventDefault(); token = input.value.trim(); input.value = ''; dialog.close();
     generation++;
     el('gitUpdateCheck').hidden = false; el('gitUpdateForget').hidden = false;
-    el('gitUpdateAuthorize').textContent = '更換授權';
+    el('gitUpdateAuthorize').textContent = '更換更新密碼';
     check();
   };
   el('gitUpdateForget').onclick = () => {
     token = ''; generation++; input.value = '';
     el('gitUpdateCheck').hidden = true; el('gitUpdateForget').hidden = true;
     el('gitUpdateAuthorize').textContent = '手動更新 data';
-    status('授權已清除；已啟動的雲端工作仍會完成。');
+    status('本分頁密碼已清除；已啟動的工作仍會完成。');
   };
   el('gitUpdateCheck').onclick = () => check(true);
   async function api(route, method = 'GET', body) {
     const response = await fetch(API + route, {
-      method, cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(30000),
-      headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${token}`, 'X-GitHub-Api-Version': '2022-11-28', ...(body ? { 'Content-Type': 'application/json' } : {}) },
-      ...(body ? { body: JSON.stringify(body) } : {}),
+      method, cache:'no-store', redirect:'error', signal:AbortSignal.timeout(30000),
+      headers:{'X-Update-Key':token,...(body?{'Content-Type':'application/json'}:{})},
+      ...(body?{body:JSON.stringify(body)}:{}),
     });
     if (!response.ok) {
-      if (response.status === 401) throw Error('Token 無效或已到期，請重新授權。');
-      if (response.status === 403 || response.status === 404) throw Error('無法存取工作流程；請確認專案權限及 Actions: Read and write，或稍後重試。');
-      throw Error(`GitHub 回應 HTTP ${response.status}，請稍後重試。`);
+      const result=await response.json().catch(()=>({}));
+      throw Error(result.error || `更新後台回應 HTTP ${response.status}`);
     }
-    return response.status === 204 ? null : response.json();
+    return response.status===204?null:response.json();
   }
   async function manifest() {
     const response = await fetch(RAW + 'data/manifest.json?t=' + Date.now(), { cache:'no-store', signal:AbortSignal.timeout(30000) });
