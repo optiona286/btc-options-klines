@@ -6,7 +6,7 @@
 
 1. 開啟 GitHub Pages，按「手動更新 data」。
 2. 在 GitHub 建立專用 Fine-grained Token，僅選 btc-options-klines，Repository permissions 設定 Actions: Read and write，設定短效期。
-3. 在網頁輸入 Token。它保存在目前分頁的 sessionStorage，重新整理仍保留，不存入 localStorage、Cookie、Git、日誌或網址。關閉分頁或按清除授權時清除。請勿把 Token 貼到聊天。
+3. 在網頁輸入 Token。它保存在此瀏覽器的 localStorage，重新整理及關閉後重開仍保留，不存入 Cookie、Git、日誌或網址。按清除授權或清除網站資料時清除；其他裝置需各自輸入一次。請勿把 Token 貼到聊天。
 4. 按一次更新，只檢查一次缺少的 UTC 來源日；有缺日才觸發雲端下載、CRC 驗證、既有 1h 精簡、資料驗證、自動提交及正常推送 main。
 
 工作中的執行會顯示進度及紀錄連結，不再重複觸發。GitHub concurrency 仍保留，避免交錯推送。工作結束後讀回 main 的 manifest 核對，再重新載入圖表。若仍缺日期、官方 ZIP 尚未發布、或執行失敗，顯示結果，不自動重試；可按「手動更新」手動再執行。

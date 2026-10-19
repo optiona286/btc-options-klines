@@ -1,7 +1,7 @@
 # BTC Options K 線系統：獨立 1h 精簡專案
 
 ## 網頁手動更新（data）
-開啟 GitHub Pages，在「手動更新 data」輸入專用 Fine-grained Token（只選本儲存庫，Actions: Read and write）。Token 只保存在目前分頁的 sessionStorage，重新整理仍保留；關閉分頁或清除授權時清除。按下更新後網頁檢查缺少的 UTC 來源日，觸發原有 Actions 下載官方 ZIP、驗證、精簡及存回 Git，顯示進度並載入最新資料。已移除 20:00 排程。不使用 Cloudflare 或 R2。見 [雲端自動化說明](cloud-automation/README.md)。
+開啟 GitHub Pages，在「手動更新 data」輸入專用 Fine-grained Token（只選本儲存庫，Actions: Read and write）。Token 保存在此瀏覽器的 localStorage，重新整理及關閉後重開仍保留，直到清除授權或網站資料。按下更新後網頁檢查缺少的 UTC 來源日，觸發原有 Actions 下載官方 ZIP、驗證、精簡及存回 Git，顯示進度並載入最新資料。已移除 20:00 排程。不使用 Cloudflare 或 R2。見 [雲端自動化說明](cloud-automation/README.md)。
 
 幣安 data1 已改回本機排程，每日 15:50、15:55 執行；幣安 GitHub workflow 已停用。這次網頁更新只處理 Bybit data。
 
