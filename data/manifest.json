@@ -5,25 +5,42 @@
   "dataType": "OPTION_MARK_PRICE_OHLC",
   "volumeAvailable": false,
   "window": "Expiry UTC date minus two days through expiry UTC date",
-  "generatedAt": "2026-10-21T07:31:54.326Z",
-  "sourceFiles": 2465,
+  "generatedAt": "2026-10-22T07:10:45.142Z",
+  "sourceFiles": 2466,
   "files": [
+    {
+      "name": "2026-10-23",
+      "path": "2026-10-23.json.gz",
+      "date": "2026-10-23",
+      "interval": "1h",
+      "size": 39503,
+      "modifiedAt": "2026-10-22T07:10:45.142Z",
+      "sourceDays": 1,
+      "firstDate": "2026-10-21",
+      "lastDate": "2026-10-21",
+      "missingDates": [
+        "2026-10-22",
+        "2026-10-23"
+      ],
+      "barCount": 1702,
+      "symbolCount": 74,
+      "volumeAvailable": false
+    },
     {
       "name": "2026-10-22",
       "path": "2026-10-22.json.gz",
       "date": "2026-10-22",
       "interval": "1h",
-      "size": 29393,
-      "modifiedAt": "2026-10-21T07:31:54.326Z",
-      "sourceDays": 1,
+      "size": 61457,
+      "modifiedAt": "2026-10-22T07:10:45.142Z",
+      "sourceDays": 2,
       "firstDate": "2026-10-20",
-      "lastDate": "2026-10-20",
+      "lastDate": "2026-10-21",
       "missingDates": [
-        "2026-10-21",
         "2026-10-22"
       ],
-      "barCount": 1156,
-      "symbolCount": 50,
+      "barCount": 2454,
+      "symbolCount": 58,
       "volumeAvailable": false
     },
     {
@@ -31,15 +48,13 @@
       "path": "2026-10-21.json.gz",
       "date": "2026-10-21",
       "interval": "1h",
-      "size": 61531,
-      "modifiedAt": "2026-10-21T07:31:54.326Z",
-      "sourceDays": 2,
+      "size": 70348,
+      "modifiedAt": "2026-10-22T07:10:45.142Z",
+      "sourceDays": 3,
       "firstDate": "2026-10-19",
-      "lastDate": "2026-10-20",
-      "missingDates": [
-        "2026-10-21"
-      ],
-      "barCount": 2466,
+      "lastDate": "2026-10-21",
+      "missingDates": [],
+      "barCount": 2882,
       "symbolCount": 52,
       "volumeAvailable": false
     },
@@ -41373,6 +41388,6 @@
       "dataType": "OPTION_MARK_PRICE_OHLC_SAMPLED"
     }
   ],
-  "totalBars": 1905020,
-  "totalBytes": 45520972
+  "totalBars": 1908436,
+  "totalBytes": 45601356
 }
