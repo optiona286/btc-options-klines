@@ -8,6 +8,7 @@ function files(folder){return fs.readdirSync(folder,{withFileTypes:true}).flatMa
 (async()=>{
  if(!fs.existsSync(input))throw Error('找不到幣安來源資料夾：'+input);
  fs.mkdirSync(stateDir,{recursive:true});
+ fs.mkdirSync(dir,{recursive:true});
  const lock=path.join(stateDir,'binance.lock');if(fs.existsSync(lock)){try{process.kill(Number(fs.readFileSync(lock,'utf8')),0);throw Error('幣安轉換已在執行');}catch(e){if(e.code!=='ESRCH')throw e;fs.unlinkSync(lock);}}
  fs.writeFileSync(lock,String(process.pid),{flag:'wx'});process.on('exit',()=>{try{fs.unlinkSync(lock);}catch{}});
  const ledgerPath=path.join(stateDir,'binance-processed.json'),ledger=fs.existsSync(ledgerPath)?JSON.parse(fs.readFileSync(ledgerPath,'utf8')):{};
@@ -38,7 +39,10 @@ function files(folder){return fs.readdirSync(folder,{withFileTypes:true}).flatMa
     if(content.interval!==interval)throw Error('既有資料週期不符');
     for(const [symbol,added] of symbols){const merged=new Map((content.symbols[symbol]||[]).map(b=>[b[0],b]));for(const [t,b] of added)merged.set(t,b);content.symbols[symbol]=[...merged.values()].sort((a,b)=>a[0]-b[0]);}
     const dates=new Set();let barCount=0;for(const bars of Object.values(content.symbols)){barCount+=bars.length;for(const b of bars)dates.add(local(b[0]));}const sorted=[...dates].sort(),bytes=zlib.gzipSync(JSON.stringify(content));
-    const entry={name:'data1:'+expiry,path:name,date:expiry,interval,size:bytes.length,modifiedAt:new Date().toISOString(),sourceDays:dates.size,firstDate:sorted[0],lastDate:sorted.at(-1),barCount,symbolCount:Object.keys(content.symbols).length,volumeAvailable:true,provider:'Binance',dataType:'OPTION_TRADE_OHLC',missingDates:Array.from({length:3},(_,i)=>new Date(Date.parse(expiry+'T00:00:00Z')-(2-i)*86400000).toISOString().slice(0,10)).filter(d=>!dates.has(d))};outputs.push({target,bytes,entry});
+    const entry={name:'data1:'+expiry,path:name,date:expiry,interval,size:bytes.length,modifiedAt:new Date().toISOString(),sourceDays:dates.size,firstDate:sorted[0],lastDate:sorted.at(-1),barCount,symbolCount:Object.keys(content.symbols).length,volumeAvailable:true,provider:'Binance',dataType:'OPTION_TRADE_OHLC',missingDates:Array.from({length:3},(_,i)=>new Date(Date.parse(expiry+'T00:00:00Z')-(2-i)*86400000).toISOString().slice(0,10)).filter(d=>!dates.has(d))};
+    const prior=manifest.files.find(f=>f.name===entry.name);
+    if(fs.existsSync(target)&&fs.readFileSync(target).equals(bytes)&&prior&&Object.keys(entry).every(k=>k==='modifiedAt'||JSON.stringify(prior[k])===JSON.stringify(entry[k])))continue;
+    outputs.push({target,bytes,entry});
    }
    for(const item of outputs){atomic(item.target,item.bytes);manifest.files=manifest.files.filter(f=>f.name!==item.entry.name);manifest.files.push(item.entry);}
    if(outputs.length){manifest.files.sort((a,b)=>b.date.localeCompare(a.date));manifest.generatedAt=new Date().toISOString();atomic(manifestPath,JSON.stringify(manifest,null,2));updated++;}

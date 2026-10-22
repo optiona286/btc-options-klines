@@ -11,7 +11,7 @@ module.exports=function start(root){
  child.on('error',e=>{error=e.message;});child.on('close',code=>{children.delete(child);if(code!==0||error)state.error+=(state.error?'\n':'')+label+'：'+(error||'退出碼 '+code);resolve();});});}
  async function tick(){if(state.running||stopping)return;state.running=true;state.error='';try{
   await run(path.join(root,'資料轉換工具','convert.js'),[],'標記價格');
-  if(!stopping)await run(path.join(root,'convert-binance-data1.cjs'),[root],'幣安成交');
+  // data1 is owned by the independent background converter/publisher to avoid races.
  }catch(e){state.error=e.message;}finally{revision();state.lastScan=new Date().toISOString();state.running=false;state.stage=state.error?'部分資料轉換失敗':'檢查完成；重新整理或重開網頁時再檢查';}}
  revision();tick();
  const stop=()=>{stopping=true;for(const child of children)child.kill();};process.on('exit',stop);process.on('SIGTERM',()=>{stop();process.exit(0);});process.on('SIGINT',()=>{stop();process.exit(0);});

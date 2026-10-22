@@ -336,6 +336,14 @@ async function getBtcKlines(fileName, symbol, period, signal) {
 
 window.btcStaticApi=async function(requestedUrl,controller){
  const url=new URL(requestedUrl,'https://static.local'),signal=AbortSignal.any([controller.signal,AbortSignal.timeout(url.pathname==='/api/btc-klines'?50000:20000)]);
+ if(url.pathname==='/api/meta'){
+  const mode=url.searchParams.get('mode')||'data';
+  const response=await fetch(dataURL(mode+'/manifest.json'),{signal,cache:'no-store'});
+  if(!response.ok)throw new Error('到期日清單讀取失敗');
+  const fresh=await response.json();
+  if(activeMode!==mode||!manifest||JSON.stringify(fresh)!==JSON.stringify(manifest))dataCache.clear();
+  activeMode=mode;manifest=fresh;
+ }
  await prepare(url.searchParams.get('file'),signal,url.searchParams.get('mode')||'data');signal.throwIfAborted();
  if(url.pathname==='/api/meta')return getMeta(url.searchParams.get('file'));
  if(url.pathname==='/api/klines')return getKlines(url.searchParams.get('file'),url.searchParams.get('symbol'),url.searchParams.get('period'));
