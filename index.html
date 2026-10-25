@@ -1319,11 +1319,15 @@
         const value = boundary.value + " · " + fmt(boundary.price, 2);
         const labelY = py < top + 16 ? py + 14 : py - 5;
         const labelWidth = context.measureText(label).width;
+        const outsideX = startX - labelWidth - 8;
+        const hasOutsideRoom = outsideX >= left + 4;
+        const nameX = hasOutsideRoom ? outsideX : startX + 8;
+        const nameY = hasOutsideRoom ? labelY : labelY + 15 <= bottom - 3 ? labelY + 15 : labelY - 16;
         context.fillStyle = "rgba(17,24,35,.85)";
         context.fillRect(startX + 4, labelY - 11, context.measureText(value).width + 8, 15);
         context.fillStyle = boundary.labelColor;
         context.globalAlpha = 0.3;
-        context.fillText(label, startX - labelWidth - 8, labelY);
+        context.fillText(label, nameX, nameY);
         context.globalAlpha = 1;
         context.fillText(value, startX + 8, labelY);
       }
