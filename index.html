@@ -351,6 +351,7 @@
     #chartWrap:fullscreen, #chartWrap.chart-expanded { width:100vw!important;height:100dvh!important;min-height:0!important;margin:0!important;border:0;border-radius:0;background:var(--panel);display:flex;flex-direction:column; }
     #chartWrap.chart-expanded { position:fixed;inset:0;z-index:10000; }
     #chartWrap:fullscreen .chart-stage, #chartWrap.chart-expanded .chart-stage { flex:1;min-height:0!important; }
+    #chartWrap:fullscreen .cross-info, #chartWrap.chart-expanded .cross-info { margin:0;border-radius:0;flex-shrink:0; }
     canvas { position: absolute; inset: 0; touch-action: none; }
     .chart-message { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); pointer-events: none; font-size: 14px; }
     .chart-message[hidden] { display: none; }
@@ -1544,7 +1545,8 @@
       ui.wrap.classList.toggle("comparison-on", state.compare);
       const main = ui.wrap.parentElement;
       main.classList.toggle("comparison-layout", state.compare);
-      if (state.compare) ui.wrap.insertBefore($("crossInfo"), $("chartStage"));
+      if (document.fullscreenElement === ui.wrap || ui.wrap.classList.contains("chart-expanded")) ui.wrap.insertBefore($("crossInfo"), ui.wrap.firstChild);
+      else if (state.compare) ui.wrap.insertBefore($("crossInfo"), $("chartStage"));
       else main.insertBefore($("crossInfo"), ui.wrap);
       $("compareToggle").classList.toggle("active", state.compare);
       $("compareToggle").setAttribute("aria-pressed", String(state.compare));
@@ -2088,6 +2090,7 @@
       expandButton.setAttribute("aria-pressed", String(expanded));
       expandButton.setAttribute("aria-label", expanded ? "還原圖表" : "展開圖表");
       expandButton.title = expanded ? "還原圖表（Esc）" : "展開圖表";
+      updateCompareMode();
       requestAnimationFrame(resizeAndDraw);
     }
     function closeChartExpanded() {
@@ -2098,6 +2101,7 @@
       event.stopPropagation();
       if (document.fullscreenElement === ui.wrap) { await document.exitFullscreen(); return; }
       if (ui.wrap.classList.contains("chart-expanded")) { closeChartExpanded(); return; }
+      ui.wrap.insertBefore($("crossInfo"), ui.wrap.firstChild);
       if (ui.wrap.requestFullscreen) {
         try { await ui.wrap.requestFullscreen(); syncChartExpanded(); return; } catch { /* Embedded/mobile browsers can deny native fullscreen. */ }
       }
