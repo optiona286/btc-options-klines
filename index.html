@@ -1294,7 +1294,12 @@
       ]);
     }
 
-    function drawBtcRanges(context, boundaries, left, top, width, bottom, y) {
+    function drawBtcRanges(context, boundaries, allRows, slots, left, top, width, bottom, y) {
+      const reference = openingCandleReference(allRows);
+      if (!reference || !slots.length) return;
+      const firstVisible = slots.findIndex(row => barTaiwanTime(row) >= reference.start);
+      if (firstVisible < 0) return;
+      const startX = left + firstVisible * width / slots.length;
       context.save();
       context.beginPath(); context.rect(left, top, width, bottom - top); context.clip();
       context.lineWidth = 2;
@@ -1305,14 +1310,14 @@
         if (!Number.isFinite(py) || py < top || py > bottom) continue;
         context.strokeStyle = boundary.color;
         context.setLineDash([6, 4]);
-        context.beginPath(); context.moveTo(left, py); context.lineTo(left + width, py); context.stroke();
+        context.beginPath(); context.moveTo(startX, py); context.lineTo(left + width, py); context.stroke();
         context.setLineDash([]);
         const label = (mobileLayout.matches ? boundary.title.replace("理想範圍", "理想").replace("現實範圍", "現實").replace(" 上限 ", " ").replace(" 下限 ", " ") : boundary.title) + " · " + fmt(boundary.price, 2);
         const labelY = py < top + 16 ? py + 14 : py - 5;
         context.fillStyle = "rgba(17,24,35,.85)";
-        context.fillRect(left + 4, labelY - 11, context.measureText(label).width + 8, 15);
+        context.fillRect(startX + 4, labelY - 11, context.measureText(label).width + 8, 15);
         context.fillStyle = boundary.labelColor;
-        context.fillText(label, left + 8, labelY);
+        context.fillText(label, startX + 8, labelY);
       }
       context.restore();
     }
@@ -1534,7 +1539,7 @@
         slots.forEach((row, i) => { const value = byTime.get(row.timeUtc); if (!Number.isFinite(value)) { started = false; return; } if (started) context.lineTo(x(i), y(value)); else { context.moveTo(x(i), y(value)); started = true; } });
         context.stroke();
       }
-      drawBtcRanges(context, boundaries, left, top, width, bottom, y);
+      drawBtcRanges(context, boundaries, state.btcRows, slots, left, top, width, bottom, y);
       drawOpeningReference(context, state.btcRows, slots, left, top, width, bottom, y, "line");
       drawYellowRangeExtremes(context, state.indicators.finalSession ? state.btcRows : valid, slots, left, top, width, bottom, y);
       const hover = state.hover >= state.start && state.hover < state.start + slots.length ? state.hover - state.start : -1;
@@ -1659,7 +1664,7 @@
         ctx.fillRect(cx - candleW / 2, bodyTop, candleW, bodyHeight);
       });
 
-      drawBtcRanges(ctx, boundaries, left, top, plotW, priceBottom, y);
+      drawBtcRanges(ctx, boundaries, state.rows, rows, left, top, plotW, priceBottom, y);
       drawOpeningReference(ctx, state.rows, rows, left, top, plotW, priceBottom, y, "line");
 
       function line(valuesToDraw, color, width = 1.5) {
