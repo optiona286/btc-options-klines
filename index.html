@@ -726,6 +726,7 @@
           <button class="toggle active" data-indicator="openingRange" title="最後 24h 第一根 K 線的最高與最低價，向右延伸透明漸層">首根高低範圍</button>
           <button class="toggle active" data-indicator="baseline" title="最後 24h 第一根 K 線（最高價＋最低價）÷ 2，白色實線">基準線</button>
           <button class="toggle active" data-indicator="idealRange" title="BTC/USD：最後 24h 第一根開盤價上下 2,000 點，虛線不透明度 30%">理想範圍</button>
+          <button class="toggle active" data-indicator="beyondRange" title="理想範圍的 1.5 倍，紅色上下限">極限範圍</button>
           <button class="toggle active" data-indicator="realityRange" title="BTC/USD：最後 24h 第一根開盤價上下 1,000 點，虛線不透明度 30%">現實範圍</button>
           <label for="btcRangeMode" style="font-size:12px;color:var(--muted);align-self:center">BTC 範圍</label>
           <select id="btcRangeMode" aria-label="BTC 理想與現實範圍模式" style="width:auto;min-width:130px"><option value="fixed">固定點數</option><option value="dynamic">動態百分比</option></select>
@@ -779,7 +780,7 @@
       hover: -1,
       dragging: false,
       dragX: 0,
-      indicators: { ma7: true, ma20: true, bb: false, highLow: true, volume: true, finalSession: true, finalSixHours: true, openingRange: true, baseline: true, idealRange: true, realityRange: true },
+      indicators: { ma7: true, ma20: true, bb: false, highLow: true, volume: true, finalSession: true, finalSixHours: true, openingRange: true, baseline: true, idealRange: true, realityRange: true, beyondRange: true },
       expiry: "", favorites: [], mode: "strike", autoRefresh: false, rangeMode: "fixed",
       busy: false, metaBusy: false, requestId: 0, controller: null,
       studies: null, hoverY: null,
@@ -1281,10 +1282,12 @@
         if (!(base > 0)) return [];
         outer = base * range.outerPct / 100; inner = base * range.innerPct / 100;
         outerText = `${Number(range.outerPct.toFixed(4))}%`; innerText = `${Number(range.innerPct.toFixed(4))}%`;
-        info.textContent = `前兩日最大幅度 ${range.maxPct.toFixed(4)}% ｜理想 ±${outerText} ｜現實 ±${innerText} ｜基準 ${fmt(base,2)}（首棒收盤後固定）`;
+        info.textContent = `前兩日最大幅度 ${range.maxPct.toFixed(4)}% ｜理想 ±${outerText} ｜現實 ±${innerText} ｜極限 ±${Number((range.outerPct * 1.5).toFixed(4))}% ｜基準 ${fmt(base,2)}（首棒收盤後固定）`;
         info.title = range.days.map(day=>new Date(day.from).toLocaleString("zh-TW",{timeZone:"Asia/Taipei",hour12:false})+`：上漲 ${day.up.toFixed(4)}%／下跌 ${day.down.toFixed(4)}%`).join("\n");
-      } else { info.textContent = "固定點數：本契約日首根開盤價，理想 ±2,000 點／現實 ±1,000 點。"; info.title = ""; }
+      } else { info.textContent = "固定點數：本契約日首根開盤價，理想 ±2,000 點／現實 ±1,000 點／極限 ±3,000 點。"; info.title = ""; }
+      const beyondText = state.rangeMode === "dynamic" ? `${Number((outer / base * 150).toFixed(4))}%` : "3,000";
       const ranges = [
+        ["beyondRange", "極限範圍", outer * 1.5, beyondText, "rgba(255,77,95,.55)", "#ff4d5f"],
         ["idealRange", "理想範圍", outer, outerText, "rgba(245,185,66,.30)", "#f5b942"],
         ["realityRange", "現實範圍", inner, innerText, "rgba(66,200,245,.30)", "#42c8f5"]
       ];
@@ -1312,7 +1315,7 @@
         context.setLineDash([6, 4]);
         context.beginPath(); context.moveTo(startX, py); context.lineTo(left + width, py); context.stroke();
         context.setLineDash([]);
-        const label = (mobileLayout.matches ? boundary.title.replace("理想範圍", "理想").replace("現實範圍", "現實").replace(" 上限 ", " ").replace(" 下限 ", " ") : boundary.title) + " · " + fmt(boundary.price, 2);
+        const label = (mobileLayout.matches ? boundary.title.replace("理想範圍", "理想").replace("現實範圍", "現實").replace("極限範圍", "極限").replace(" 上限 ", " ").replace(" 下限 ", " ") : boundary.title) + " · " + fmt(boundary.price, 2);
         const labelY = py < top + 16 ? py + 14 : py - 5;
         context.fillStyle = "rgba(17,24,35,.85)";
         context.fillRect(startX + 4, labelY - 11, context.measureText(label).width + 8, 15);
