@@ -1292,8 +1292,8 @@
         ["realityRange", "現實範圍", inner, innerText, "rgba(66,200,245,.30)", "#42c8f5"]
       ];
       return ranges.filter(([key]) => state.indicators[key]).flatMap(([, title, distance, text, color, labelColor]) => [
-        { price:base + distance, title:title + " 上限 +" + text, color, labelColor },
-        { price:base - distance, title:title + " 下限 −" + text, color, labelColor }
+        { price:base + distance, title:title + " 上限", value:"+" + text, color, labelColor },
+        { price:base - distance, title:title + " 下限", value:"−" + text, color, labelColor }
       ]);
     }
 
@@ -1315,12 +1315,16 @@
         context.setLineDash([6, 4]);
         context.beginPath(); context.moveTo(startX, py); context.lineTo(left + width, py); context.stroke();
         context.setLineDash([]);
-        const label = (mobileLayout.matches ? boundary.title.replace("理想範圍", "理想").replace("現實範圍", "現實").replace("極限範圍", "極限").replace(" 上限 ", " ").replace(" 下限 ", " ") : boundary.title) + " · " + fmt(boundary.price, 2);
+        const label = mobileLayout.matches ? boundary.title.replace("理想範圍", "理想").replace("現實範圍", "現實").replace("極限範圍", "極限") : boundary.title;
+        const value = boundary.value + " · " + fmt(boundary.price, 2);
         const labelY = py < top + 16 ? py + 14 : py - 5;
+        const labelWidth = context.measureText(label).width;
         context.fillStyle = "rgba(17,24,35,.85)";
-        context.fillRect(startX + 4, labelY - 11, context.measureText(label).width + 8, 15);
+        context.fillRect(startX - labelWidth - 12, labelY - 11, labelWidth + 8, 15);
+        context.fillRect(startX + 4, labelY - 11, context.measureText(value).width + 8, 15);
         context.fillStyle = boundary.labelColor;
-        context.fillText(label, startX + 8, labelY);
+        context.fillText(label, startX - labelWidth - 8, labelY);
+        context.fillText(value, startX + 8, labelY);
       }
       context.restore();
     }
