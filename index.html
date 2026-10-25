@@ -352,6 +352,12 @@
     #chartWrap.chart-expanded { position:fixed;inset:0;z-index:10000; }
     #chartWrap:fullscreen .chart-stage, #chartWrap.chart-expanded .chart-stage { flex:1;min-height:0!important; }
     #chartWrap:fullscreen .cross-info, #chartWrap.chart-expanded .cross-info { margin:0;border-radius:0;flex-shrink:0; }
+    .fullscreen-chain-toggle { display:none; }
+    #chartWrap:fullscreen .fullscreen-chain-toggle, #chartWrap.chart-expanded .fullscreen-chain-toggle { display:block;position:fixed;left:0;top:45%;z-index:31;width:25px;height:64px;padding:0;border:1px solid var(--line2);border-left:0;border-radius:0 9px 9px 0;background:#18232bea;color:var(--cyan);cursor:pointer; }
+    #chartWrap .fullscreen-chain { position:fixed!important;left:0;top:0;bottom:0;width:min(420px,88vw)!important;height:100dvh!important;min-height:0!important;display:grid!important;grid-template-rows:auto auto auto auto minmax(0,1fr)!important;z-index:32;background:#0d131c;border-right:1px solid var(--line2);box-shadow:8px 0 30px #0007;transform:translateX(-101%);visibility:hidden;pointer-events:none;transition:transform .18s ease,visibility .18s; }
+    #chartWrap .fullscreen-chain.chain-open { transform:translateX(0);visibility:visible;pointer-events:auto; }
+    #chartWrap .fullscreen-chain .chain-wrap { min-height:0;overflow-y:auto;overscroll-behavior:contain; }
+    @media (prefers-reduced-motion: reduce) { #chartWrap .fullscreen-chain { transition:none; } }
     canvas { position: absolute; inset: 0; touch-action: none; }
     .chart-message { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); pointer-events: none; font-size: 14px; }
     .chart-message[hidden] { display: none; }
@@ -702,6 +708,7 @@
         <div class="card"><span>K 棒數</span><b id="barsValue">--</b></div>
       </section>
       <section class="chart-wrap" id="chartWrap">
+        <button id="fullscreenChainToggle" class="fullscreen-chain-toggle" type="button" aria-label="顯示篩選與期權鏈" aria-expanded="false" title="滑鼠移到左側，顯示篩選與期權鏈">❯</button>
         <div class="mobile-chart-bar">
           <div id="mobilePeriods" class="mobile-periods" role="group" aria-label="K 線週期"></div>
           <button id="mobilePriceLookup" type="button" aria-pressed="false" title="查價時鎖住平移，仍可雙指縮放；再按一次退出">查價</button>
@@ -2084,9 +2091,38 @@
     }, { passive: false });
     }
     const expandButton = $("chartExpand");
+    const chainToggle = $("fullscreenChainToggle"), fullscreenChain = document.querySelector("aside");
+    const chainParent = fullscreenChain.parentNode, chainNext = fullscreenChain.nextSibling;
+    function setFullscreenChainOpen(open) {
+      fullscreenChain.classList.toggle("chain-open", open);
+      fullscreenChain.inert = !open;
+      fullscreenChain.setAttribute("aria-hidden", String(!open));
+      chainToggle.setAttribute("aria-expanded", String(open));
+    }
+    function placeFullscreenChain(expanded) {
+      if (expanded) {
+        if (!fullscreenChain.classList.contains("fullscreen-chain")) {
+          ui.wrap.append(fullscreenChain); fullscreenChain.classList.add("fullscreen-chain"); setFullscreenChainOpen(false);
+        }
+      } else if (fullscreenChain.classList.contains("fullscreen-chain")) {
+        fullscreenChain.classList.remove("fullscreen-chain", "chain-open"); fullscreenChain.inert = false; fullscreenChain.removeAttribute("aria-hidden");
+        chainParent.insertBefore(fullscreenChain, chainNext?.parentNode === chainParent ? chainNext : null);
+        chainToggle.setAttribute("aria-expanded", "false");
+      }
+    }
+    chainToggle.addEventListener("pointerenter", event => { if (event.pointerType === "mouse") setFullscreenChainOpen(true); });
+    chainToggle.addEventListener("click", event => { event.stopPropagation(); setFullscreenChainOpen(!fullscreenChain.classList.contains("chain-open")); });
+    fullscreenChain.addEventListener("pointerleave", event => { if (event.pointerType === "mouse" && fullscreenChain.classList.contains("fullscreen-chain")) setFullscreenChainOpen(false); });
+    ui.wrap.addEventListener("pointermove", event => {
+      if (event.pointerType === "mouse" && event.clientX <= 8 && fullscreenChain.classList.contains("fullscreen-chain")) setFullscreenChainOpen(true);
+    });
+    ui.wrap.addEventListener("pointerdown", event => {
+      if (fullscreenChain.classList.contains("fullscreen-chain") && !fullscreenChain.contains(event.target) && !chainToggle.contains(event.target)) setFullscreenChainOpen(false);
+    });
     let previousBodyOverflow = "";
     function syncChartExpanded() {
       const expanded = document.fullscreenElement === ui.wrap || ui.wrap.classList.contains("chart-expanded");
+      placeFullscreenChain(expanded);
       expandButton.setAttribute("aria-pressed", String(expanded));
       expandButton.setAttribute("aria-label", expanded ? "還原圖表" : "展開圖表");
       expandButton.title = expanded ? "還原圖表（Esc）" : "展開圖表";
