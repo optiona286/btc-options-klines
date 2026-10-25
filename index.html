@@ -343,6 +343,14 @@
     .chart-tools { position: relative; top: auto; left: auto; padding: 9px 10px; border-bottom: 1px solid var(--line); }
     .chart-wrap { display: flex; flex-direction: column; min-height: 260px; }
     .chart-stage { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+    .chart-expand { position:absolute;right:12px;bottom:12px;z-index:8;width:36px;height:36px;min-height:0;padding:8px;border:1px solid #ffffff38;border-radius:50%;background:#18232be8;color:#e6edf7;display:grid;place-items:center;cursor:pointer;box-shadow:0 2px 8px #0004; }
+    .chart-expand:hover { background:#344154; }
+    .chart-expand:focus-visible { outline:2px solid var(--cyan);outline-offset:3px; }
+    .chart-expand svg { width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round; }
+    .chart-expand[aria-pressed="true"] svg { transform:rotate(180deg); }
+    #chartWrap:fullscreen, #chartWrap.chart-expanded { width:100vw!important;height:100dvh!important;min-height:0!important;margin:0!important;border:0;border-radius:0;background:var(--panel);display:flex;flex-direction:column; }
+    #chartWrap.chart-expanded { position:fixed;inset:0;z-index:10000; }
+    #chartWrap:fullscreen .chart-stage, #chartWrap.chart-expanded .chart-stage { flex:1;min-height:0!important; }
     canvas { position: absolute; inset: 0; touch-action: none; }
     .chart-message { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); pointer-events: none; font-size: 14px; }
     .chart-message[hidden] { display: none; }
@@ -734,7 +742,7 @@
         <div id="chartStage" class="chart-stage">
           <canvas id="chart" aria-label="期權 K 線圖，拖曳平移，滾輪縮放，雙擊回到最新"></canvas>
           <div id="chartMessage" class="chart-message">正在載入行情…</div>
-
+          <button id="chartExpand" class="chart-expand" type="button" aria-label="展開圖表" aria-pressed="false" title="展開圖表"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 16 4 20m0-5v5h5M16 8l4-4m-5 0h5v5"/></svg></button>
         </div>
         <div class="chart-footer"><span id="viewRange">--</span><span id="gestureHelp">拖曳平移 · 滾輪縮放 · 雙擊回到最新</span></div>
       </section>
@@ -2073,6 +2081,31 @@
       zoom(event.deltaY > 0 ? 10 : -10, ratio);
     }, { passive: false });
     }
+    const expandButton = $("chartExpand");
+    let previousBodyOverflow = "";
+    function syncChartExpanded() {
+      const expanded = document.fullscreenElement === ui.wrap || ui.wrap.classList.contains("chart-expanded");
+      expandButton.setAttribute("aria-pressed", String(expanded));
+      expandButton.setAttribute("aria-label", expanded ? "還原圖表" : "展開圖表");
+      expandButton.title = expanded ? "還原圖表（Esc）" : "展開圖表";
+      requestAnimationFrame(resizeAndDraw);
+    }
+    function closeChartExpanded() {
+      ui.wrap.classList.remove("chart-expanded"); document.body.style.overflow = previousBodyOverflow; syncChartExpanded();
+    }
+    expandButton.addEventListener("pointerdown", event => event.stopPropagation());
+    expandButton.addEventListener("click", async event => {
+      event.stopPropagation();
+      if (document.fullscreenElement === ui.wrap) { await document.exitFullscreen(); return; }
+      if (ui.wrap.classList.contains("chart-expanded")) { closeChartExpanded(); return; }
+      if (ui.wrap.requestFullscreen) {
+        try { await ui.wrap.requestFullscreen(); syncChartExpanded(); return; } catch { /* Embedded/mobile browsers can deny native fullscreen. */ }
+      }
+      previousBodyOverflow = document.body.style.overflow; document.body.style.overflow = "hidden";
+      ui.wrap.classList.add("chart-expanded"); syncChartExpanded(); expandButton.focus();
+    });
+    document.addEventListener("fullscreenchange", syncChartExpanded);
+    document.addEventListener("keydown", event => { if (event.key === "Escape" && ui.wrap.classList.contains("chart-expanded")) closeChartExpanded(); });
     window.addEventListener("resize", resizeAndDraw);
 
     function showError(error) {
