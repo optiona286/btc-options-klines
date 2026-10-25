@@ -711,6 +711,8 @@
           <button class="toggle active" data-indicator="baseline" title="最後 24h 第一根 K 線（最高價＋最低價）÷ 2，白色實線">基準線</button>
           <button class="toggle active" data-indicator="idealRange" title="BTC/USD：最後 24h 第一根開盤價上下 2,000 點，虛線不透明度 30%">理想範圍</button>
           <button class="toggle active" data-indicator="realityRange" title="BTC/USD：最後 24h 第一根開盤價上下 1,000 點，虛線不透明度 30%">現實範圍</button>
+          <label for="btcRangeMode" style="font-size:12px;color:var(--muted);align-self:center">BTC 範圍</label>
+          <select id="btcRangeMode" aria-label="BTC 理想與現實範圍模式" style="width:auto;min-width:130px"><option value="fixed">固定點數</option><option value="dynamic">動態百分比</option></select>
           <button class="toggle active" data-indicator="volume">成交量</button>
           <button class="toggle" data-action="latest">回到最新</button>
           <button class="toggle" data-action="zoomIn" aria-label="放大 K 線">＋</button>
@@ -719,6 +721,7 @@
           <button class="toggle" data-action="png">存 PNG</button>
           <button class="toggle" data-action="csv">匯出 CSV</button>
         </div>
+        <div id="btcRangeInfo" role="status" style="font-size:12px;color:var(--muted);padding:6px 12px;line-height:1.6" hidden></div>
         <div class="comparison-pane">
           <div class="comparison-heading">BTC / USD · 現貨<span id="btcCompareProvider">載入後顯示來源 · 與期權同步時間</span></div>
           <div id="btcCrossInfo" class="comparison-info">--</div>
@@ -744,6 +747,7 @@
     <button id="mobileFilter" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16M9 4v4M15 10v4M8 16v4"/></svg><span>篩選</span></button>
   </nav>
 
+  <script src="./dynamic-range.js"></script>
   <script src="./static-api.js?v=20261019-web-data-update"></script>
   <script>
     const state = {
@@ -760,7 +764,7 @@
       dragging: false,
       dragX: 0,
       indicators: { ma7: true, ma20: true, bb: false, highLow: true, volume: true, finalSession: true, finalSixHours: true, openingRange: true, baseline: true, idealRange: true, realityRange: true },
-      expiry: "", favorites: [], mode: "strike", autoRefresh: false,
+      expiry: "", favorites: [], mode: "strike", autoRefresh: false, rangeMode: "fixed",
       busy: false, metaBusy: false, requestId: 0, controller: null,
       studies: null, hoverY: null,
       view: "option", compare: false, btcRows: [], btcByTime: new Map(),
@@ -774,6 +778,7 @@
         if (typeof saved[key] === "string") state[key] = saved[key];
       }
       if (["data", "data1"].includes(saved.datasetMode)) state.datasetMode = saved.datasetMode;
+      if (["fixed", "dynamic"].includes(saved.rangeMode)) state.rangeMode = saved.rangeMode;
       if (["strike", "volume", "favorites"].includes(saved.mode)) state.mode = saved.mode;
       if (["option", "btc"].includes(saved.view)) state.view = saved.view;
       state.compare = saved.compare === true;
@@ -803,7 +808,7 @@
     function saveSettings() {
       renderMobilePeriods();
       const { file, period, selected, expiry, mode, favorites, autoRefresh, indicators, view, compare } = state;
-      try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ file, period, selected, expiry, mode, favorites, autoRefresh, indicators, view, compare, datasetMode:state.datasetMode })); } catch {}
+      try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ file, period, selected, expiry, mode, favorites, autoRefresh, indicators, view, compare, rangeMode:state.rangeMode, datasetMode:state.datasetMode })); } catch {}
     }
 
     const ONLINE_ONLY = /\.github\.io$/i.test(location.hostname);
@@ -1242,17 +1247,34 @@
 
     function btcRangeBoundaries(allRows) {
       const session = finalSessionWindow();
-      if (!session) return [];
+      const info = $("btcRangeInfo");
+      info.hidden = !(state.view === "btc" || state.compare);
+      if (!session) { info.textContent = "選擇合約後顯示 BTC 範圍。"; return []; }
       // Use the actual opening candle; a missing opening slot is never replaced by a later bar.
       const first = allRows.find(row => barTaiwanTime(row) === session.start);
-      if (!first || !Number.isFinite(first.open)) return [];
+      if (!first || !Number.isFinite(first.open)) { info.textContent = "尚未取得本契約日首根 K 線，暫不顯示範圍。"; info.title = ""; return []; }
+      let base = first.open, outer = 2000, inner = 1000, outerText = "2,000", innerText = "1,000";
+      if (state.rangeMode === "dynamic") {
+        const step = {"15m":900000,"1h":3600000,"4h":14400000}[state.period];
+        const range = window.btcDynamicRange.historicalRange(allRows.map(row=>({openTime:barTaiwanTime(row),high:row.high,low:row.low})),session.end,state.period);
+        if (!range || !Number.isFinite(first.high) || !Number.isFinite(first.low)) {
+          info.textContent = "動態範圍：前兩個完整契約日資料不足，暫不顯示。"; info.title = ""; return [];
+        }
+        if (Date.now() < session.start + step) { info.textContent = "動態範圍：等待本契約日首根 K 線收盤後固定。"; info.title = ""; return []; }
+        base = (first.high + first.low) / 2;
+        if (!(base > 0)) return [];
+        outer = base * range.outerPct / 100; inner = base * range.innerPct / 100;
+        outerText = `${Number(range.outerPct.toFixed(4))}%`; innerText = `${Number(range.innerPct.toFixed(4))}%`;
+        info.textContent = `前兩日最大幅度 ${range.maxPct.toFixed(4)}% ｜理想 ±${outerText} ｜現實 ±${innerText} ｜基準 ${fmt(base,2)}（首棒收盤後固定）`;
+        info.title = range.days.map(day=>new Date(day.from).toLocaleString("zh-TW",{timeZone:"Asia/Taipei",hour12:false})+`：上漲 ${day.up.toFixed(4)}%／下跌 ${day.down.toFixed(4)}%`).join("\n");
+      } else { info.textContent = "固定點數：本契約日首根開盤價，理想 ±2,000 點／現實 ±1,000 點。"; info.title = ""; }
       const ranges = [
-        ["idealRange", "理想範圍", 2000, "rgba(245,185,66,.30)", "#f5b942"],
-        ["realityRange", "現實範圍", 1000, "rgba(66,200,245,.30)", "#42c8f5"]
+        ["idealRange", "理想範圍", outer, outerText, "rgba(245,185,66,.30)", "#f5b942"],
+        ["realityRange", "現實範圍", inner, innerText, "rgba(66,200,245,.30)", "#42c8f5"]
       ];
-      return ranges.filter(([key]) => state.indicators[key]).flatMap(([, title, distance, color, labelColor]) => [
-        { price:first.open + distance, title:title + " 上限 +" + distance.toLocaleString("zh-TW"), color, labelColor },
-        { price:first.open - distance, title:title + " 下限 −" + distance.toLocaleString("zh-TW"), color, labelColor }
+      return ranges.filter(([key]) => state.indicators[key]).flatMap(([, title, distance, text, color, labelColor]) => [
+        { price:base + distance, title:title + " 上限 +" + text, color, labelColor },
+        { price:base - distance, title:title + " 下限 −" + text, color, labelColor }
       ]);
     }
 
@@ -1526,6 +1548,7 @@
     });
     updateCompareMode();
     function draw() {
+      $("btcRangeInfo").hidden = !(state.view === "btc" || state.compare);
       drawOption();
       drawCompareBtc();
     }
@@ -1878,6 +1901,12 @@
       $("autoRefresh").textContent = `自動重讀：${state.autoRefresh ? "30 秒" : "關"}`;
       $("autoRefresh").setAttribute("aria-pressed", String(state.autoRefresh));
     }
+    $("btcRangeMode").value = state.rangeMode;
+    $("btcRangeMode").addEventListener("change", () => {
+      state.rangeMode = $("btcRangeMode").value;
+      for (const key of ["idealRange","realityRange"]) $("chartWrap").querySelector(`[data-indicator="${key}"]`)?.setAttribute("title",state.rangeMode === "dynamic" ? "依前兩完整契約日最大漲跌幅及本日首棒高低中點計算" : key === "idealRange" ? "BTC/USD：首根開盤價上下 2,000 點" : "BTC/USD：首根開盤價上下 1,000 點");
+      saveSettings(); draw();
+    });
     $("autoRefresh").addEventListener("click", () => { state.autoRefresh = !state.autoRefresh; saveSettings(); updateAutoButton(); });
     $("focusChart").addEventListener("click", () => {
       const focus = document.querySelector(".layout").classList.toggle("focus");
