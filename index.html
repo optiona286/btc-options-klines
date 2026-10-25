@@ -1320,10 +1320,11 @@
         const labelY = py < top + 16 ? py + 14 : py - 5;
         const labelWidth = context.measureText(label).width;
         context.fillStyle = "rgba(17,24,35,.85)";
-        context.fillRect(startX - labelWidth - 12, labelY - 11, labelWidth + 8, 15);
         context.fillRect(startX + 4, labelY - 11, context.measureText(value).width + 8, 15);
         context.fillStyle = boundary.labelColor;
+        context.globalAlpha = 0.3;
         context.fillText(label, startX - labelWidth - 8, labelY);
+        context.globalAlpha = 1;
         context.fillText(value, startX + 8, labelY);
       }
       context.restore();
