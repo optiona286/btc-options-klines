@@ -215,13 +215,76 @@ function optionTimestamp(row) {
   return Date.parse(String(row.openTimeLocal).replace(" ", "T") + "+08:00");
 }
 
+const BTC_PROVIDER_STATE = 'btc-spot-provider-health-v1';
+const BTC_HISTORY_CACHE = 'btc-spot-history-v1';
+const BTC_HISTORY_TTL = 7 * 86400000;
+let btcProviderHealth = {};
+try {
+  const saved = JSON.parse(sessionStorage.getItem(BTC_PROVIDER_STATE) || '{}');
+  if (saved && typeof saved === 'object' && !Array.isArray(saved)) btcProviderHealth = saved;
+} catch { /* Storage is optional. */ }
+function rememberBtcProvider(name, ok) {
+  btcProviderHealth[name] = ok
+    ? { goodUntil: Date.now() + 30 * 60000, retryAfter: 0 }
+    : { goodUntil: 0, retryAfter: Date.now() + 5 * 60000 };
+  try { sessionStorage.setItem(BTC_PROVIDER_STATE, JSON.stringify(btcProviderHealth)); } catch {}
+}
+function btcHistoryRequest(key) {
+  return new URL('./__btc_spot_history__/' + encodeURIComponent(key), document.baseURI).href;
+}
+function validBtcHistory(entry, start, end, granularity) {
+  if (entry?.version !== 1 || entry.start !== start || entry.end !== end || entry.granularity !== granularity
+      || entry.expires <= Date.now() || !['Bitstamp', 'Coinbase Exchange'].includes(entry.result?.provider)
+      || !Array.isArray(entry.result.items) || !entry.result.items.length) return false;
+  let previous = -Infinity;
+  return entry.result.items.every(bar => {
+    const time = Date.parse(String(bar.timeUtc).replace(' ', 'T') + 'Z');
+    const valid = Number.isFinite(time) && time >= start && time < end && time > previous
+      && [bar.open, bar.high, bar.low, bar.close, bar.volume].every(Number.isFinite)
+      && bar.low > 0 && bar.high >= Math.max(bar.open, bar.close) && bar.low <= Math.min(bar.open, bar.close)
+      && bar.volume >= 0;
+    previous = time;
+    return valid;
+  });
+}
+async function readBtcHistory(key, start, end, granularity) {
+  if (!('caches' in window) || end > Date.now() - 3600000) return null;
+  try {
+    const cache = await caches.open(BTC_HISTORY_CACHE);
+    const response = await cache.match(btcHistoryRequest(key));
+    if (!response) return null;
+    const entry = await response.json();
+    if (validBtcHistory(entry, start, end, granularity)) return entry;
+    await cache.delete(btcHistoryRequest(key));
+  } catch { /* A blocked/full cache must not block market data. */ }
+  return null;
+}
+async function writeBtcHistory(key, start, end, granularity, result) {
+  if (!('caches' in window) || end > Date.now() - 3600000) return;
+  try {
+    const cache = await caches.open(BTC_HISTORY_CACHE);
+    const entry = { version: 1, start, end, granularity, expires: Date.now() + BTC_HISTORY_TTL, result };
+    await cache.put(btcHistoryRequest(key), new Response(JSON.stringify(entry), { headers: { 'Content-Type': 'application/json' } }));
+    const keys = await cache.keys();
+    await Promise.all(keys.slice(0, Math.max(0, keys.length - 24)).map(request => cache.delete(request)));
+  } catch { /* Market data remains usable when storage is unavailable. */ }
+}
+
 async function fetchBtcCandles(start, end, granularity, signal) {
+  signal.throwIfAborted();
   const key = `${start}:${end}:${granularity}`;
   const cached = btcCache.get(key);
   if (cached && cached.expires > Date.now()) return cached.result;
   const step = granularity * 1000;
   if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) throw new Error("BTC/USD 時間範圍無效");
   if ((end - start) / step > 10000) throw new Error("此契約時間範圍過長，請選擇較短的資料檔");
+  const history = await readBtcHistory(key, start, end, granularity);
+  signal.throwIfAborted();
+  if (history) {
+    btcCache.set(key, { result: history.result, expires: history.expires });
+    while (btcCache.size > 24) btcCache.delete(btcCache.keys().next().value);
+    return history.result;
+  }
   const providers = [
     {
       name: "Coinbase Exchange", pageSize: 299,
@@ -244,8 +307,18 @@ async function fetchBtcCandles(start, end, granularity, signal) {
       }
     }
   ];
+  // Bitstamp is the cold-start default. Keep a working source ahead of a failing one.
+  const preferredOrder = ['Bitstamp', 'Coinbase Exchange'];
+  const ready = providers.filter(provider => !(Number(btcProviderHealth[provider.name]?.retryAfter) > Date.now()));
+  const ordered = (ready.length ? ready : [...providers].sort((a, b) =>
+    (Number(btcProviderHealth[a.name]?.retryAfter) || 0) - (Number(btcProviderHealth[b.name]?.retryAfter) || 0)).slice(0, 1))
+    .sort((a, b) => {
+      const aGood = Number(btcProviderHealth[a.name]?.goodUntil) > Date.now();
+      const bGood = Number(btcProviderHealth[b.name]?.goodUntil) > Date.now();
+      return Number(bGood) - Number(aGood) || preferredOrder.indexOf(a.name) - preferredOrder.indexOf(b.name);
+    });
   const errors = [];
-  for (const provider of providers) {
+  for (const provider of ordered) {
     // Start the whole range over on fallback: do not mix exchanges within one chart.
     const bars = new Map();
     try {
@@ -255,7 +328,7 @@ async function fetchBtcCandles(start, end, granularity, signal) {
         const controller = new AbortController();
         const cancel = () => controller.abort(signal.reason);
         signal.addEventListener("abort", cancel, {once: true});
-        const timeout = setTimeout(() => controller.abort(new DOMException("行情來源連線逾時", "TimeoutError")), 8000);
+        const timeout = setTimeout(() => controller.abort(new DOMException("行情來源連線逾時", "TimeoutError")), 5000);
         let candles;
         try {
           signal.throwIfAborted();
@@ -285,13 +358,16 @@ async function fetchBtcCandles(start, end, granularity, signal) {
       const items = [...bars.entries()].sort((a, b) => a[0] - b[0]).map(entry => entry[1]);
       if (!items.length) throw new Error("此時間區間沒有 BTC/USD K 線");
       const result = {items, provider: provider.name};
+      rememberBtcProvider(provider.name, true);
       btcCache.delete(key);
-      btcCache.set(key, {result, expires: Date.now() + (end < Date.now() - 3600000 ? 3600000 : 30000)});
+      btcCache.set(key, {result, expires: Date.now() + (end < Date.now() - 3600000 ? BTC_HISTORY_TTL : 30000)});
       while (btcCache.size > 24) btcCache.delete(btcCache.keys().next().value);
+      void writeBtcHistory(key, start, end, granularity, result);
       return result;
     } catch (error) {
       // A changed selection or overall request timeout must stop all providers.
       signal.throwIfAborted();
+      rememberBtcProvider(provider.name, false);
       errors.push(provider.name + "：" + (error?.message || "連線失敗"));
     }
   }
