@@ -641,7 +641,6 @@
           <label for="datasetMode">資料模式</label><select id="datasetMode" style="margin-bottom:8px"><option value="data">原有標記價格（data）</option><option value="data1">幣安成交 K 線（data1）</option></select>
           <label for="dateMode">日期模式</label>
           <select id="dateMode" style="margin-bottom:8px"><option value="all">全部日期</option><option value="monday">周一模式</option><option value="weekend">假日模式（周六、周日）</option><option value="weekdays">周一到五模式</option></select>
-          <div style="display:flex;gap:6px;margin-bottom:8px"><button id="previousDate" class="btn" type="button">↑ 上一日</button><button id="nextDate" class="btn" type="button">↓ 下一日</button></div>
           <div id="dateModeHint" role="status" style="font-size:11px;color:var(--muted);margin-bottom:8px"></div>
           <label for="fileYear">選擇到期日期</label>
           <div class="expiry-date-controls">
@@ -952,9 +951,6 @@
     }
     function updateDateNavigation() {
       const files = matchingDateFiles();
-      const index = files.findIndex(file => file.name === ui.file.value);
-      $('previousDate').disabled = index <= 0;
-      $('nextDate').disabled = index < 0 || index >= files.length - 1;
       $('dateModeHint').textContent = files.length ? '↑／↓ 切換符合模式的日期，可跨月' : '此模式沒有可用日期，請切換其他模式';
     }
     function stepDate(direction) {
@@ -1914,8 +1910,6 @@
       saveSettings();
       if (ui.file.value && ui.file.value !== state.file) ui.file.dispatchEvent(new Event('change'));
     });
-    $('previousDate').addEventListener('click', () => stepDate(-1));
-    $('nextDate').addEventListener('click', () => stepDate(1));
     document.addEventListener('keydown', event => {
       if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.isComposing) return;
       if (event.target.closest('input, textarea, select, [contenteditable], dialog')) return;
