@@ -639,6 +639,10 @@
             <a id="gitUpdateRun" target="_blank" rel="noopener noreferrer" hidden>查看執行紀錄</a>
           </details>
           <label for="datasetMode">資料模式</label><select id="datasetMode" style="margin-bottom:8px"><option value="data">原有標記價格（data）</option><option value="data1">幣安成交 K 線（data1）</option></select>
+          <label for="dateMode">日期模式</label>
+          <select id="dateMode" style="margin-bottom:8px"><option value="all">全部日期</option><option value="monday">周一模式</option><option value="weekend">假日模式（周六、周日）</option><option value="weekdays">周一到五模式</option></select>
+          <div style="display:flex;gap:6px;margin-bottom:8px"><button id="previousDate" class="btn" type="button">↑ 上一日</button><button id="nextDate" class="btn" type="button">↓ 下一日</button></div>
+          <div id="dateModeHint" role="status" style="font-size:11px;color:var(--muted);margin-bottom:8px"></div>
           <label for="fileYear">選擇到期日期</label>
           <div class="expiry-date-controls">
             <select id="fileYear" aria-label="到期年份"></select>
@@ -788,12 +792,14 @@
     };
 
     state.datasetMode = "data";
+    state.dateMode = "all";
     const SETTINGS_KEY = "btc-options-portable-1h-v1";
     try {
       const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
       for (const key of ["file", "period", "selected", "expiry"]) {
         if (typeof saved[key] === "string") state[key] = saved[key];
       }
+      if (["all", "monday", "weekend", "weekdays"].includes(saved.dateMode)) state.dateMode = saved.dateMode;
       if (["data", "data1"].includes(saved.datasetMode)) state.datasetMode = saved.datasetMode;
       if (["fixed", "dynamic"].includes(saved.rangeMode)) state.rangeMode = saved.rangeMode;
       if (["strike", "volume", "favorites"].includes(saved.mode)) state.mode = saved.mode;
@@ -825,7 +831,7 @@
     function saveSettings() {
       renderMobilePeriods();
       const { file, period, selected, expiry, mode, favorites, autoRefresh, indicators, view, compare } = state;
-      try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ file, period, selected, expiry, mode, favorites, autoRefresh, indicators, view, compare, rangeMode:state.rangeMode, datasetMode:state.datasetMode })); } catch {}
+      try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ file, period, selected, expiry, mode, favorites, autoRefresh, indicators, view, compare, rangeMode:state.rangeMode, datasetMode:state.datasetMode, dateMode:state.dateMode })); } catch {}
     }
 
     const ONLINE_ONLY = /\.github\.io$/i.test(location.hostname);
@@ -937,8 +943,32 @@
       resizeAndDraw();
     }
 
+    function matchingDateFiles() {
+      return (state.dateFiles || []).filter(file => {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(file.date)) return false;
+        const day = new Date(file.date + 'T12:00:00Z').getUTCDay();
+        return state.dateMode === 'monday' ? day === 1 : state.dateMode === 'weekend' ? day === 0 || day === 6 : state.dateMode === 'weekdays' ? day >= 1 && day <= 5 : true;
+      }).sort((a,b) => a.date.localeCompare(b.date));
+    }
+    function updateDateNavigation() {
+      const files = matchingDateFiles();
+      const index = files.findIndex(file => file.name === ui.file.value);
+      $('previousDate').disabled = index <= 0;
+      $('nextDate').disabled = index < 0 || index >= files.length - 1;
+      $('dateModeHint').textContent = files.length ? '↑／↓ 切換符合模式的日期，可跨月' : '此模式沒有可用日期，請切換其他模式';
+    }
+    function stepDate(direction) {
+      const files = matchingDateFiles();
+      const index = files.findIndex(file => file.name === ui.file.value);
+      const next = files[index + direction];
+      if (index < 0 || !next) return;
+      renderDateSelectors({ year: next.date.slice(0,4), month: next.date.slice(5,7) });
+      ui.file.value = next.name;
+      updateDateNavigation();
+      ui.file.dispatchEvent(new Event('change'));
+    }
     function renderDateSelectors({ year, month } = {}) {
-      const files = (state.dateFiles || []).filter(file => /^\d{4}-\d{2}-\d{2}$/.test(file.date));
+      const files = matchingDateFiles();
       const current = files.find(file => file.name === state.file) || files[0];
       const years = [...new Set(files.map(file => file.date.slice(0, 4)))].sort().reverse();
       year = years.includes(year) ? year : current?.date.slice(0, 4);
@@ -955,6 +985,7 @@
       $('chosenExpiryLabel').hidden = !ONLINE_ONLY || !selected;
       $('chosenExpiryLabel').textContent = selected ? expiryLabel(selected.date) : '';
       for (const control of [ui.fileYear, ui.fileMonth, ui.file]) control.disabled = !files.length;
+      updateDateNavigation();
     }
 
     async function loadMeta({ preserveFile = false, preserveView = false } = {}) {
@@ -1876,6 +1907,22 @@
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
 
+    $('dateMode').value = state.dateMode;
+    $('dateMode').addEventListener('change', () => {
+      state.dateMode = $('dateMode').value;
+      renderDateSelectors();
+      saveSettings();
+      if (ui.file.value && ui.file.value !== state.file) ui.file.dispatchEvent(new Event('change'));
+    });
+    $('previousDate').addEventListener('click', () => stepDate(-1));
+    $('nextDate').addEventListener('click', () => stepDate(1));
+    document.addEventListener('keydown', event => {
+      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.isComposing) return;
+      if (event.target.closest('input, textarea, select, [contenteditable], dialog')) return;
+      if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+      event.preventDefault();
+      stepDate(event.key === 'ArrowUp' ? -1 : 1);
+    });
     for (const control of [ui.fileYear, ui.fileMonth]) control.addEventListener('change', () => {
       renderDateSelectors({ year: ui.fileYear.value, month: ui.fileMonth.value });
       if (ui.file.value && ui.file.value !== state.file) ui.file.dispatchEvent(new Event('change'));

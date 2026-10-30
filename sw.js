@@ -1,5 +1,5 @@
 'use strict';
-const VERSION = 'btc-options-pwa-v14-dynamic-range';
+const VERSION = 'btc-options-pwa-v15-date-modes';
 const SHELL = VERSION + '-shell';
 const DATA = VERSION + '-data';
 const BASE = new URL('./', self.location.href);
