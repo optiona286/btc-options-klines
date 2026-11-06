@@ -10,8 +10,8 @@
       "path": "binance-2026-11-06.json.gz",
       "date": "2026-11-06",
       "interval": "15m",
-      "size": 95581,
-      "modifiedAt": "2026-11-06T07:52:07.765Z",
+      "size": 95586,
+      "modifiedAt": "2026-11-06T07:56:46.095Z",
       "sourceDays": 3,
       "firstDate": "2026-11-04",
       "lastDate": "2026-11-06",
@@ -2252,5 +2252,5 @@
       "dataType": "OPTION_TRADE_OHLC"
     }
   ],
-  "generatedAt": "2026-11-06T07:52:07.785Z"
+  "generatedAt": "2026-11-06T07:56:46.114Z"
 }
