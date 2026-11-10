@@ -1,16 +1,33 @@
 (() => {
 'use strict';
-const dataCache=new Map(),btcCache=new Map();let manifest=null, activeMode="data";
-const dataURL=relative=>location.hostname==='optiona286.github.io'?new URL(relative,'https://raw.githubusercontent.com/optiona286/btc-options-klines/main/'):new URL('./'+relative,document.baseURI);
+const dataCache=new Map(),btcCache=new Map();let manifest=null, activeMode="data", manifestBase=null;
+const rawDataBase='https://raw.githubusercontent.com/optiona286/btc-options-klines/main/';
+async function refreshDataManifest(mode,signal){
+ const localBase=new URL('./',document.baseURI).href;
+ const bases=location.hostname==='optiona286.github.io'?(mode==='data'?[localBase,rawDataBase]:[rawDataBase]):[localBase];
+ const results=await Promise.allSettled(bases.map(async base=>{
+  const response=await fetch(new URL(mode+'/manifest.json',base),{signal:AbortSignal.any([signal,AbortSignal.timeout(5000)]),cache:'no-store'});
+  if(!response.ok)throw new Error('到期日清單讀取失敗');
+  const data=await response.json();
+  if(!Array.isArray(data.files))throw new Error('到期日清單格式錯誤');
+  const updated=data.files.reduce((latest,file)=>Math.max(latest,Date.parse(file.modifiedAt)||0),0);
+  return {base,data,updated};
+ }));
+ signal.throwIfAborted();
+ const fresh=results.flatMap(result=>result.status==='fulfilled'?[result.value]:[])
+  .sort((a,b)=>b.updated-a.updated||b.data.files.length-a.data.files.length)[0];
+ if(!fresh)throw new Error('到期日清單讀取失敗');
+ if(activeMode!==mode||manifestBase!==fresh.base||JSON.stringify(fresh.data)!==JSON.stringify(manifest))dataCache.clear();
+ activeMode=mode;manifest=fresh.data;manifestBase=fresh.base;
+}
 window.btcResetStaticData=()=>{manifest=null;dataCache.clear();};
 function listDataFiles(){return manifest.files;}
 function resolveDataFile(name){const files=listDataFiles();if(!files.length)throw new Error('沒有精簡資料');return files.find(file=>file.name===name)||files[0];}
 function loadRows(name){const selected=resolveDataFile(name),cached=dataCache.get(selected.name);if(!cached)throw new Error('資料尚未載入');return {selected,...cached};}
 async function prepare(name,signal,mode="data"){
- if(activeMode!==mode){manifest=null;activeMode=mode;}
- if(!manifest){const response=await fetch(dataURL(activeMode+'/manifest.json'),{signal,cache:'no-store'});if(!response.ok)throw new Error('到期日清單讀取失敗');manifest=await response.json();}
+ if(activeMode!==mode||!manifest)await refreshDataManifest(mode,signal);
  const selected=resolveDataFile(name);if(dataCache.has(selected.name))return;
- const response=await fetch(dataURL(activeMode+'/'+selected.path),{signal,cache:'no-store'});if(!response.ok)throw new Error('精簡資料下載失敗');
+ const response=await fetch(new URL(mode+'/'+selected.path,manifestBase),{signal,cache:'no-store'});if(!response.ok)throw new Error('精簡資料下載失敗');
  const bytes=new Uint8Array(await response.arrayBuffer());
  const text=bytes[0]===31&&bytes[1]===139?await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text():new TextDecoder().decode(bytes);
  const content=JSON.parse(text),rows=[],bySymbol=new Map();
@@ -414,11 +431,7 @@ window.btcStaticApi=async function(requestedUrl,controller){
  const url=new URL(requestedUrl,'https://static.local'),signal=AbortSignal.any([controller.signal,AbortSignal.timeout(url.pathname==='/api/btc-klines'?50000:20000)]);
  if(url.pathname==='/api/meta'){
   const mode=url.searchParams.get('mode')||'data';
-  const response=await fetch(dataURL(mode+'/manifest.json'),{signal,cache:'no-store'});
-  if(!response.ok)throw new Error('到期日清單讀取失敗');
-  const fresh=await response.json();
-  if(activeMode!==mode||!manifest||JSON.stringify(fresh)!==JSON.stringify(manifest))dataCache.clear();
-  activeMode=mode;manifest=fresh;
+  await refreshDataManifest(mode,signal);
  }
  await prepare(url.searchParams.get('file'),signal,url.searchParams.get('mode')||'data');signal.throwIfAborted();
  if(url.pathname==='/api/meta')return getMeta(url.searchParams.get('file'));

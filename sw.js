@@ -1,5 +1,5 @@
 'use strict';
-const VERSION = 'btc-options-pwa-v17-spot-fast-source';
+const VERSION = 'btc-options-pwa-v18-fresh-data-source';
 const SHELL = VERSION + '-shell';
 const DATA = VERSION + '-data';
 const BASE = new URL('./', self.location.href);
