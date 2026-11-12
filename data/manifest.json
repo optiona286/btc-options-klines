@@ -5,25 +5,57 @@
   "dataType": "OPTION_MARK_PRICE_OHLC",
   "volumeAvailable": false,
   "window": "Expiry UTC date minus two days through expiry UTC date",
-  "generatedAt": "2026-11-10T07:30:52.555Z",
-  "sourceFiles": 2485,
+  "generatedAt": "2026-11-12T00:32:18.633Z",
+  "sourceFiles": 2487,
   "files": [
+    {
+      "name": "2026-11-13",
+      "path": "2026-11-13.json.gz",
+      "date": "2026-11-13",
+      "interval": "1h",
+      "size": 42211,
+      "modifiedAt": "2026-11-12T00:32:18.633Z",
+      "sourceDays": 1,
+      "firstDate": "2026-11-11",
+      "lastDate": "2026-11-11",
+      "missingDates": [
+        "2026-11-12",
+        "2026-11-13"
+      ],
+      "barCount": 1818,
+      "symbolCount": 80,
+      "volumeAvailable": false
+    },
+    {
+      "name": "2026-11-12",
+      "path": "2026-11-12.json.gz",
+      "date": "2026-11-12",
+      "interval": "1h",
+      "size": 66156,
+      "modifiedAt": "2026-11-12T00:32:18.633Z",
+      "sourceDays": 2,
+      "firstDate": "2026-11-10",
+      "lastDate": "2026-11-11",
+      "missingDates": [
+        "2026-11-12"
+      ],
+      "barCount": 2636,
+      "symbolCount": 58,
+      "volumeAvailable": false
+    },
     {
       "name": "2026-11-11",
       "path": "2026-11-11.json.gz",
       "date": "2026-11-11",
       "interval": "1h",
-      "size": 30913,
-      "modifiedAt": "2026-11-10T07:30:52.555Z",
-      "sourceDays": 1,
+      "size": 73746,
+      "modifiedAt": "2026-11-12T00:32:18.633Z",
+      "sourceDays": 3,
       "firstDate": "2026-11-09",
-      "lastDate": "2026-11-09",
-      "missingDates": [
-        "2026-11-10",
-        "2026-11-11"
-      ],
-      "barCount": 1212,
-      "symbolCount": 52,
+      "lastDate": "2026-11-11",
+      "missingDates": [],
+      "barCount": 3014,
+      "symbolCount": 58,
       "volumeAvailable": false
     },
     {
@@ -31,15 +63,13 @@
       "path": "2026-11-10.json.gz",
       "date": "2026-11-10",
       "interval": "1h",
-      "size": 60845,
-      "modifiedAt": "2026-11-10T07:30:52.555Z",
-      "sourceDays": 2,
+      "size": 71169,
+      "modifiedAt": "2026-11-12T00:32:17.120Z",
+      "sourceDays": 3,
       "firstDate": "2026-11-08",
-      "lastDate": "2026-11-09",
-      "missingDates": [
-        "2026-11-10"
-      ],
-      "barCount": 2434,
+      "lastDate": "2026-11-10",
+      "missingDates": [],
+      "barCount": 2898,
       "symbolCount": 58,
       "volumeAvailable": false
     },
@@ -41673,6 +41703,6 @@
       "dataType": "OPTION_MARK_PRICE_OHLC_SAMPLED"
     }
   ],
-  "totalBars": 1973066,
-  "totalBytes": 47134649
+  "totalBars": 1979786,
+  "totalBytes": 47296173
 }
