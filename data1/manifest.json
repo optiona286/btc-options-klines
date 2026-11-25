@@ -11,7 +11,7 @@
       "date": "2026-11-25",
       "interval": "15m",
       "size": 77499,
-      "modifiedAt": "2026-11-25T07:51:03.511Z",
+      "modifiedAt": "2026-11-25T07:55:53.033Z",
       "sourceDays": 3,
       "firstDate": "2026-11-23",
       "lastDate": "2026-11-25",
@@ -2575,5 +2575,5 @@
       "dataType": "OPTION_TRADE_OHLC"
     }
   ],
-  "generatedAt": "2026-11-25T07:51:03.531Z"
+  "generatedAt": "2026-11-25T07:55:53.052Z"
 }
