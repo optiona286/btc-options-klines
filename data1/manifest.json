@@ -6,6 +6,23 @@
   "window": "Expiry Taipei date minus two days through expiry Taipei date",
   "files": [
     {
+      "name": "data1:2026-11-26",
+      "path": "binance-2026-11-26.json.gz",
+      "date": "2026-11-26",
+      "interval": "15m",
+      "size": 85691,
+      "modifiedAt": "2026-11-26T07:51:19.230Z",
+      "sourceDays": 3,
+      "firstDate": "2026-11-24",
+      "lastDate": "2026-11-26",
+      "barCount": 9220,
+      "symbolCount": 48,
+      "volumeAvailable": true,
+      "provider": "Binance",
+      "dataType": "OPTION_TRADE_OHLC",
+      "missingDates": []
+    },
+    {
       "name": "data1:2026-11-25",
       "path": "binance-2026-11-25.json.gz",
       "date": "2026-11-25",
@@ -2575,5 +2592,5 @@
       "dataType": "OPTION_TRADE_OHLC"
     }
   ],
-  "generatedAt": "2026-11-25T07:55:53.052Z"
+  "generatedAt": "2026-11-26T07:51:19.251Z"
 }
